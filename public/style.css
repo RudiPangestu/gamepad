@@ -1,0 +1,201 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+:root {
+  --bg: #0e1015;
+  --panel: #1a1d27;
+  --accent: #3ddc97;
+  --a: #6ad36a;   /* hijau (A) */
+  --b: #e5534b;   /* merah (B) */
+  --x: #4a90e2;   /* biru (X) */
+  --y: #f1c40f;   /* kuning (Y) */
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  font-family: -apple-system, system-ui, sans-serif;
+  color: #fff;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* paksa landscape look */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.status {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #2a2d3a;
+  color: #ffb24a;
+  z-index: 50;
+}
+.status.ok { color: #3ddc97; }
+.status.err { color: #e5534b; }
+
+.pad {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  gap: 8px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex: 1;
+}
+
+/* ----- Stik analog ----- */
+.stick-zone {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stick-base {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #2a2f3d, #14161d);
+  border: 2px solid #2f3545;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 4px 12px rgba(0,0,0,.5);
+}
+.stick-knob {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #59617a, #2c3243);
+  border: 2px solid #6b7390;
+  box-shadow: 0 4px 10px rgba(0,0,0,.6);
+  transition: transform .03s linear;
+}
+.zone-label {
+  position: absolute;
+  bottom: -14px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #5a6275;
+}
+
+/* ----- D-pad ----- */
+.dpad {
+  position: relative;
+  width: 132px;
+  height: 132px;
+}
+.dbtn {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: var(--panel);
+  border: 1px solid #2f3545;
+  color: #aab;
+  font-size: 14px;
+  border-radius: 10px;
+}
+.dbtn.active { background: var(--accent); color: #06241a; }
+.dbtn.up    { top: 0; left: 44px; }
+.dbtn.down  { bottom: 0; left: 44px; }
+.dbtn.left  { left: 0; top: 44px; }
+.dbtn.right { right: 0; top: 44px; }
+
+/* ----- Tombol muka ABXY ----- */
+.face {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+.fbtn {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0c0c0c;
+  box-shadow: 0 4px 8px rgba(0,0,0,.5);
+}
+.fbtn:active, .fbtn.active { filter: brightness(1.4); transform: scale(.94); }
+.fbtn.y { background: var(--y); top: 0;   left: 47px; }
+.fbtn.x { background: var(--x); top: 47px; left: 0; }
+.fbtn.b { background: var(--b); top: 47px; right: 0; }
+.fbtn.a { background: var(--a); bottom: 0; left: 47px; }
+
+/* ----- Tengah ----- */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+.triggers, .bumpers, .meta {
+  display: flex;
+  gap: 12px;
+}
+.trig, .bump {
+  width: 64px;
+  height: 34px;
+  background: var(--panel);
+  border: 1px solid #2f3545;
+  color: #aab;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.trig.active, .bump.active { background: var(--accent); color: #06241a; }
+.metabtn {
+  padding: 6px 12px;
+  background: #20242f;
+  border: 1px solid #2f3545;
+  color: #8a93a6;
+  border-radius: 6px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.metabtn.active { background: var(--accent); color: #06241a; }
+
+/* Hint putar layar bila portrait */
+@media (orientation: portrait) {
+  .pad { display: none; }
+  body::after {
+    content: "↻ Putar iPhone ke posisi landscape (horizontal)";
+    color: #aab;
+    font-size: 16px;
+    text-align: center;
+    padding: 0 30px;
+  }
+}

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>iPhone Gamepad</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="status" class="status">Menghubungkan…</div>
+
+  <div class="pad">
+    <!-- Kiri: stik kiri + d-pad -->
+    <div class="side left">
+      <div class="stick-zone" id="leftStick">
+        <div class="stick-base"><div class="stick-knob"></div></div>
+        <div class="zone-label">GERAK</div>
+      </div>
+      <div class="dpad">
+        <button class="dbtn up"    data-dpad="up">▲</button>
+        <button class="dbtn left"  data-dpad="left">◀</button>
+        <button class="dbtn right" data-dpad="right">▶</button>
+        <button class="dbtn down"  data-dpad="down">▼</button>
+      </div>
+    </div>
+
+    <!-- Tengah: bumper/trigger + start/select -->
+    <div class="center">
+      <div class="triggers">
+        <button class="trig" data-btn="l2">L2</button>
+        <button class="trig" data-btn="r2">R2</button>
+      </div>
+      <div class="bumpers">
+        <button class="bump" data-btn="l1">L1</button>
+        <button class="bump" data-btn="r1">R1</button>
+      </div>
+      <div class="meta">
+        <button class="metabtn" data-btn="select">SELECT</button>
+        <button class="metabtn" data-btn="start">START</button>
+      </div>
+    </div>
+
+    <!-- Kanan: tombol muka + stik kanan -->
+    <div class="side right">
+      <div class="face">
+        <button class="fbtn y" data-btn="y">Y</button>
+        <button class="fbtn x" data-btn="x">X</button>
+        <button class="fbtn b" data-btn="b">B</button>
+        <button class="fbtn a" data-btn="a">A</button>
+      </div>
+      <div class="stick-zone" id="rightStick">
+        <div class="stick-base"><div class="stick-knob"></div></div>
+        <div class="zone-label">KAMERA</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="controller.js"></script>
+</body>
+</html>

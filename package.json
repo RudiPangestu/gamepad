@@ -1,0 +1,30 @@
+{
+  "name": "iphone-mac-gamepad",
+  "version": "1.0.0",
+  "description": "Jadikan iPhone sebagai controller (gamepad) untuk game yang berjalan di MacBook. iPhone terhubung ke Mac lewat WiFi, input diterjemahkan menjadi keyboard & mouse.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "keywords": [
+    "gamepad",
+    "controller",
+    "iphone",
+    "macos",
+    "websocket",
+    "game"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
