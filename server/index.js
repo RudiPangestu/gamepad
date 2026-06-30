@@ -136,6 +136,28 @@ app.get("/connect", (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+// Tangani error server (mis. port sudah dipakai) dengan pesan ramah, bukan
+// melempar stack-trace yang membingungkan.
+let handledServerError = false;
+function handleServerError(err) {
+  if (handledServerError) return;
+  handledServerError = true;
+  if (err && err.code === "EADDRINUSE") {
+    console.error(`\n❌  Port ${PORT} sudah dipakai — kemungkinan server lain masih berjalan.`);
+    console.error("    Solusi (pilih salah satu):");
+    console.error(`      • Tutup jendela/Terminal server yang lama.`);
+    console.error(`      • Hentikan proses di port ${PORT}:`);
+    console.error(`          lsof -ti tcp:${PORT} | xargs kill`);
+    console.error(`      • Atau jalankan di port lain:`);
+    console.error(`          PORT=8090 npm start    (lalu buka http://<IP-MAC>:8090)\n`);
+  } else {
+    console.error("Server error:", err?.message || err);
+  }
+  process.exit(1);
+}
+server.on("error", handleServerError);
+wss.on("error", handleServerError);
+
 // --- Sesi input PER KONEKSI ------------------------------------------------
 // Melacak tombol/mouse yang ditahan koneksi ini, agar saat putus hanya melepas
 // miliknya sendiri (bukan milik pemain lain). Lapisan fisik (inputController)
