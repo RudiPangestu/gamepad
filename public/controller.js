@@ -8,6 +8,7 @@ const statusEl = document.getElementById("status");
 
 // --- Pemain (1 atau 2). 0 = belum dipilih. ---------------------------------
 let player = parseInt(localStorage.getItem("player"), 10) || 0;
+let slotCounts = { 1: 0, 2: 0 }; // jumlah HP di tiap slot (dari server)
 
 // --- Koneksi WebSocket dengan auto-reconnect ------------------------------
 let ws = null;
@@ -19,8 +20,40 @@ function wsUrl() {
 }
 
 function statusConnected() {
+  // Tampilkan peringatan bila slotku dipakai lebih dari 1 HP (bentrok).
+  if (player && (slotCounts[player] || 0) > 1) {
+    statusEl.textContent = `⚠️ P${player} dipakai ${slotCounts[player]} HP`;
+    statusEl.className = "status warn";
+    return;
+  }
   statusEl.textContent = `🎮 P${player} Terhubung`;
   statusEl.className = player === 2 ? "status ok p2" : "status ok";
+}
+
+// Perbarui badge slot di modal pilih pemain + status bar.
+function renderSlots() {
+  for (const s of [1, 2]) {
+    const el = document.querySelector(`.pstate[data-state="${s}"]`);
+    if (!el) continue;
+    const count = slotCounts[s] || 0;
+    el.classList.remove("free", "mine", "other");
+    if (count === 0) {
+      el.textContent = "kosong";
+      el.classList.add("free");
+    } else if (player === s) {
+      if (count > 1) {
+        el.textContent = `kamu +${count - 1} ⚠️`;
+        el.classList.add("other");
+      } else {
+        el.textContent = "dipakai kamu";
+        el.classList.add("mine");
+      }
+    } else {
+      el.textContent = count > 1 ? `dipakai (${count} HP)` : "dipakai HP lain";
+      el.classList.add("other");
+    }
+  }
+  if (connected && player) statusConnected();
 }
 
 function connect() {
@@ -35,6 +68,15 @@ function connect() {
     } else {
       statusEl.textContent = "🎮 Terhubung";
       statusEl.className = "status ok";
+    }
+  };
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.type === "slots") {
+      slotCounts = msg.counts || { 1: 0, 2: 0 };
+      renderSlots();
     }
   };
 
@@ -492,6 +534,7 @@ function setPlayer(p) {
     send({ type: "hello", player: p });
     statusConnected();
   }
+  renderSlots();
   loadKeymap(); // muat keymap pemain ini
 }
 
@@ -502,6 +545,7 @@ document.querySelectorAll(".player-btn").forEach((btn) => {
 // Tombol "Ganti" di pengaturan -> buka lagi modal pilih pemain.
 document.getElementById("changePlayer").addEventListener("click", () => {
   settingsEl.classList.add("hidden");
+  renderSlots();
   playerSelectEl.classList.remove("hidden");
 });
 

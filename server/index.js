@@ -11,7 +11,7 @@
 // ----------------------------------------------------------------------------
 
 import express from "express";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import os from "os";
 import path from "path";
@@ -119,6 +119,7 @@ async function syncNamespaced(state, ns, desired) {
 function createSessionState() {
   return {
     player: 1,
+    helloReceived: false, // true setelah iPhone memilih slot pemain
     rightStick: { x: 0, y: 0 },
     mouseLoop: null,
     namespaced: new Map(),
@@ -126,11 +127,32 @@ function createSessionState() {
   };
 }
 
-const connectedPlayers = new Set();
+// Hitung berapa koneksi yang aktif di tiap slot pemain (yang sudah memilih).
+function computeSlotCounts() {
+  const counts = { 1: 0, 2: 0 };
+  for (const c of wss.clients) {
+    if (c.readyState === WebSocket.OPEN && c._state && c._state.helloReceived) {
+      counts[c._state.player] = (counts[c._state.player] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+// Siarkan status slot ke semua iPhone agar bisa menampilkan indikator.
+function broadcastSlots() {
+  const payload = JSON.stringify({ type: "slots", counts: computeSlotCounts() });
+  for (const c of wss.clients) {
+    if (c.readyState === WebSocket.OPEN) {
+      try { c.send(payload); } catch {}
+    }
+  }
+}
 
 wss.on("connection", (ws) => {
   const state = createSessionState();
+  ws._state = state; // agar bisa dibaca saat menghitung slot
   console.log("[ws] controller terhubung (menunggu pilihan pemain)");
+  broadcastSlots(); // kirim status awal ke koneksi baru
 
   // Loop gerak mouse untuk stik kanan (mode mouse). Hanya berarti untuk pemain
   // yang memakai mode mouse (default Player 1).
@@ -173,8 +195,8 @@ wss.on("connection", (ws) => {
     try { await queue; } catch {} // tunggu pesan tersisa selesai diproses
     state.namespaced.clear();
     await state.io.releaseAll();
-    connectedPlayers.delete(state.player);
     console.log(`[ws] Player ${state.player} terputus`);
+    broadcastSlots();
   });
 
   ws.on("error", () => {});
@@ -188,11 +210,11 @@ async function handleMessage(msg, state) {
       // lepas tombol pemetaan lama agar tidak ada yang nyangkut
       state.namespaced.clear();
       await state.io.releaseAll();
-      connectedPlayers.delete(state.player);
       state.player = newPlayer;
     }
-    connectedPlayers.add(state.player);
+    state.helloReceived = true;
     console.log(`[ws] -> Player ${state.player} terhubung`);
+    broadcastSlots();
     return;
   }
 

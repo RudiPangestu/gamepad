@@ -142,7 +142,9 @@ menghapus semua perubahan.
 Bisa 2 iPhone sekaligus jadi Player 1 & Player 2.
 1. Buka alamat server di **kedua** iPhone (WiFi sama).
 2. Tiap iPhone memilih slot: **Player 1** atau **Player 2** (bisa diganti
-   kapan saja lewat ⚙︎ → "Ganti").
+   kapan saja lewat ⚙︎ → "Ganti"). Layar pemilihan menampilkan **indikator
+   slot**: _kosong_, _dipakai kamu_, atau _dipakai HP lain_ — dan memberi
+   peringatan ⚠️ bila dua HP tak sengaja memilih slot yang sama.
 3. Tiap pemain punya **keymap sendiri** dan bisa di-remap terpisah:
    - **Player 1** default: `WASD` + mouse (kamera).
    - **Player 2** default: `IJKL` + tombol angka/huruf lain, **tanpa mouse**
