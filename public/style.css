@@ -204,6 +204,92 @@ body {
 .pstate.mine  { background: #11283f; color: #4a90e2; }      /* dipakai kamu */
 .pstate.other { background: #3a2118; color: #ff9a6a; }      /* dipakai HP lain */
 
+/* ===== Slot terkunci (dipakai HP lain) ===== */
+.player-btn.locked {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+/* ===== Profil ===== */
+.profile-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.profile-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid #2c3140;
+  background: #1b1f2a;
+  font-size: 13px;
+}
+.profile-item.active { border-color: var(--accent); background: #11281c; }
+.profile-item .pname { font-weight: 600; }
+.profile-item .pactions { display: flex; gap: 8px; }
+.profile-item .tag { font-size: 10px; color: var(--accent); }
+.profile-item .del {
+  background: #2a1b1b; border: 1px solid #4a2a2a; color: #e5847c;
+  border-radius: 6px; font-size: 11px; padding: 4px 9px;
+}
+.profile-item .use {
+  background: #20242f; border: 1px solid #3a3f50; color: #cdd3e0;
+  border-radius: 6px; font-size: 11px; padding: 4px 11px;
+}
+.profile-new { display: flex; gap: 8px; }
+.profile-new input {
+  flex: 1; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid #2c3140; background: #11141b; color: #fff; font-size: 13px;
+}
+.mini-btn {
+  padding: 9px 14px; border-radius: 9px; border: 1px solid var(--accent);
+  background: #11281c; color: var(--accent); font-weight: 700; font-size: 13px;
+}
+
+/* ===== Trackpad ===== */
+#trackpad {
+  flex-direction: column;
+  padding: 0;
+  background: #0c0e13;
+}
+.tp-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #161922;
+  border-bottom: 1px solid #2c3140;
+}
+.tp-title { font-weight: 700; }
+.tp-hint { flex: 1; font-size: 11px; color: #707a90; }
+.tp-bar .x {
+  width: 30px; height: 30px; background: #262b38; border: none;
+  color: #cdd3e0; border-radius: 8px; font-size: 14px;
+}
+.tp-surface {
+  flex: 1;
+  margin: 12px;
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(45deg, #14171f 0 14px, #161a23 14px 28px);
+  border: 1px solid #2c3140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tp-surface.touching { border-color: var(--accent); }
+.tp-watermark { color: #3a4257; font-size: 15px; letter-spacing: 1px; }
+.tp-buttons { display: flex; gap: 12px; padding: 0 12px 14px; }
+.tp-click {
+  flex: 1;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #2c3140;
+  background: #1b1f2a;
+  color: #cdd3e0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tp-click:active { background: var(--accent); color: #06241a; }
+
 /* ===== Key picker grid ===== */
 .key-grid {
   display: grid;

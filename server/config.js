@@ -1,13 +1,20 @@
 // config.js
 // ----------------------------------------------------------------------------
-// Mengelola keymap "hidup" PER PEMAIN (1 & 2): gabungan default (keymap.js) +
-// override yang disimpan user lewat remap di layar iPhone (keymap.user.json).
+// Mengelola PROFIL mapping. Tiap profil berisi keymap untuk Player 1 & 2,
+// jadi kamu bisa simpan beberapa preset (mis. "FPS", "Balapan", "Minecraft")
+// dan berganti cepat. Disimpan ke profiles.json.
 //
-//  - getKeymap(player)       : keymap efektif pemain tsb
-//  - applyPatch(player,patch): deep-merge sebagian keymap pemain, simpan, aktif
-//  - resetKeymap(player)     : kembalikan pemain tsb ke default
+// Bentuk profiles.json:
+// { "active": "Default", "profiles": { "Default": { "1": {...}, "2": {...} } } }
 //
-// Format keymap.user.json: { "1": <diff P1>, "2": <diff P2> }
+// API:
+//   getKeymap(player)            keymap pemain pada profil aktif
+//   applyPatch(player, patch)    remap pemain pada profil aktif (disimpan)
+//   resetKeymap(player)          kembalikan pemain ke default kode
+//   listProfiles()               { active, names: [...] }
+//   setActiveProfile(name)
+//   createProfile(name, copy)    buat profil baru (copy=true: salin aktif)
+//   deleteProfile(name)
 // ----------------------------------------------------------------------------
 
 import fs from "fs";
@@ -16,9 +23,9 @@ import { fileURLToPath } from "url";
 import { defaultKeymaps } from "./keymap.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const USER_FILE = path.join(__dirname, "keymap.user.json");
-
+const FILE = path.join(__dirname, "profiles.json");
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const DEFAULT_NAME = "Default";
 
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
@@ -44,73 +51,107 @@ function normalizePlayer(player) {
   return player === 2 || player === "2" ? 2 : 1;
 }
 
-// Keymap hidup per pemain.
-const current = {
-  1: deepClone(defaultKeymaps[1]),
-  2: deepClone(defaultKeymaps[2]),
-};
+function freshProfile() {
+  return { 1: deepClone(defaultKeymaps[1]), 2: deepClone(defaultKeymaps[2]) };
+}
 
-function loadUserOverrides() {
+// State default.
+let store = { active: DEFAULT_NAME, profiles: { [DEFAULT_NAME]: freshProfile() } };
+
+function load() {
   try {
-    if (!fs.existsSync(USER_FILE)) return;
-    const raw = JSON.parse(fs.readFileSync(USER_FILE, "utf8"));
-    for (const p of [1, 2]) {
-      if (raw[p]) deepMerge(current[p], raw[p]);
+    if (!fs.existsSync(FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
+    if (raw && raw.profiles && typeof raw.profiles === "object") {
+      // pastikan tiap profil punya keymap P1 & P2
+      const profiles = {};
+      for (const name of Object.keys(raw.profiles)) {
+        if (UNSAFE_KEYS.has(name)) continue;
+        const p = raw.profiles[name] || {};
+        profiles[name] = {
+          1: deepMerge(freshProfile()[1], p[1] || {}),
+          2: deepMerge(freshProfile()[2], p[2] || {}),
+        };
+      }
+      if (!profiles[DEFAULT_NAME]) profiles[DEFAULT_NAME] = freshProfile();
+      store.profiles = profiles;
+      store.active = profiles[raw.active] ? raw.active : DEFAULT_NAME;
+      console.log(`[config] ${Object.keys(profiles).length} profil dimuat (aktif: ${store.active})`);
     }
-    console.log("[config] override user dimuat dari keymap.user.json");
   } catch (err) {
-    console.warn("[config] gagal memuat keymap.user.json:", err?.message || err);
+    console.warn("[config] gagal memuat profiles.json:", err?.message || err);
   }
 }
-loadUserOverrides();
+load();
+
+function save() {
+  try {
+    fs.writeFileSync(FILE, JSON.stringify(store, null, 2));
+  } catch (err) {
+    console.warn("[config] gagal menyimpan profiles.json:", err?.message || err);
+  }
+}
+
+function activeProfile() {
+  if (!store.profiles[store.active]) store.active = DEFAULT_NAME;
+  if (!store.profiles[store.active]) store.profiles[store.active] = freshProfile();
+  return store.profiles[store.active];
+}
 
 export function getKeymap(player = 1) {
-  return current[normalizePlayer(player)];
+  return activeProfile()[normalizePlayer(player)];
 }
 
 export function applyPatch(player, patch) {
   const p = normalizePlayer(player);
-  deepMerge(current[p], patch);
-  saveOverrides();
-  return current[p];
+  deepMerge(activeProfile()[p], patch);
+  save();
+  return activeProfile()[p];
 }
 
 export function resetKeymap(player) {
   const p = normalizePlayer(player);
-  current[p] = deepClone(defaultKeymaps[p]);
-  saveOverrides();
-  return current[p];
+  activeProfile()[p] = deepClone(defaultKeymaps[p]);
+  save();
+  return activeProfile()[p];
 }
 
-function saveOverrides() {
-  try {
-    const diff = {};
-    for (const p of [1, 2]) {
-      const d = diffFromDefaults(current[p], defaultKeymaps[p]);
-      if (Object.keys(d).length) diff[p] = d;
-    }
-    if (Object.keys(diff).length === 0) {
-      if (fs.existsSync(USER_FILE)) fs.unlinkSync(USER_FILE);
-    } else {
-      fs.writeFileSync(USER_FILE, JSON.stringify(diff, null, 2));
-    }
-  } catch (err) {
-    console.warn("[config] gagal menyimpan override:", err?.message || err);
-  }
+// ---------- Manajemen profil ----------
+export function listProfiles() {
+  return { active: store.active, names: Object.keys(store.profiles) };
 }
 
-// Hitung bagian `cur` yang berbeda dari `def` (rekursif).
-function diffFromDefaults(cur, def) {
-  const out = {};
-  for (const key of Object.keys(cur)) {
-    const c = cur[key];
-    const d = def[key];
-    if (c && typeof c === "object" && !Array.isArray(c) && d && typeof d === "object") {
-      const sub = diffFromDefaults(c, d);
-      if (Object.keys(sub).length) out[key] = sub;
-    } else if (JSON.stringify(c) !== JSON.stringify(d)) {
-      out[key] = c;
-    }
-  }
-  return out;
+function cleanName(name) {
+  if (typeof name !== "string") return null;
+  const n = name.trim().slice(0, 24);
+  if (!n || UNSAFE_KEYS.has(n)) return null;
+  return n;
+}
+
+export function setActiveProfile(name) {
+  const n = cleanName(name);
+  if (!n || !store.profiles[n]) return { error: "profil tidak ada" };
+  store.active = n;
+  save();
+  return listProfiles();
+}
+
+export function createProfile(name, copyActive = true) {
+  const n = cleanName(name);
+  if (!n) return { error: "nama tidak valid" };
+  if (store.profiles[n]) return { error: "nama sudah dipakai" };
+  store.profiles[n] = copyActive ? deepClone(activeProfile()) : freshProfile();
+  store.active = n;
+  save();
+  return listProfiles();
+}
+
+export function deleteProfile(name) {
+  const n = cleanName(name);
+  if (!n || !store.profiles[n]) return { error: "profil tidak ada" };
+  if (n === DEFAULT_NAME) return { error: "profil Default tidak bisa dihapus" };
+  delete store.profiles[n];
+  if (store.active === n) store.active = DEFAULT_NAME;
+  save();
+  return listProfiles();
 }

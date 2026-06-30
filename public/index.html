@@ -106,6 +106,20 @@
         Miringkan iPhone kiri/kanan untuk menyetir. Butuh izin gerak (Motion).
       </p>
 
+      <div class="row toggle-row">
+        <span>Mode Trackpad (jadikan layar touchpad mouse)</span>
+        <button id="openTrackpad" class="toggle">Buka</button>
+      </div>
+
+      <h3>Profil Game</h3>
+      <p class="hint">Simpan beberapa preset mapping & ganti cepat per game.</p>
+      <div id="profileList" class="profile-list"></div>
+      <div class="profile-new">
+        <input id="newProfileName" type="text" placeholder="Nama profil baru…"
+          maxlength="24" autocomplete="off" />
+        <button id="createProfile" class="mini-btn">+ Buat</button>
+      </div>
+
       <h3>Ubah Tombol (Remap)</h3>
       <p class="hint">Ketuk sebuah baris untuk mengganti aksinya di Mac.</p>
       <div id="remapList" class="remap-list"></div>
@@ -122,6 +136,22 @@
         <button id="closePicker" class="x">✕</button>
       </div>
       <div id="keyGrid" class="key-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== Mode Trackpad ===== -->
+  <div id="trackpad" class="overlay hidden">
+    <div class="tp-bar">
+      <span class="tp-title">🖱 Trackpad</span>
+      <span class="tp-hint">Geser = gerak · ketuk = klik kiri</span>
+      <button id="closeTrackpad" class="x">✕</button>
+    </div>
+    <div id="tpSurface" class="tp-surface">
+      <span class="tp-watermark">Geser jari di sini</span>
+    </div>
+    <div class="tp-buttons">
+      <button id="tpLeft" class="tp-click">Klik Kiri</button>
+      <button id="tpRight" class="tp-click">Klik Kanan</button>
     </div>
   </div>
 

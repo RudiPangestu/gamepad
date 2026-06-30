@@ -143,8 +143,9 @@ Bisa 2 iPhone sekaligus jadi Player 1 & Player 2.
 1. Buka alamat server di **kedua** iPhone (WiFi sama).
 2. Tiap iPhone memilih slot: **Player 1** atau **Player 2** (bisa diganti
    kapan saja lewat ⚙︎ → "Ganti"). Layar pemilihan menampilkan **indikator
-   slot**: _kosong_, _dipakai kamu_, atau _dipakai HP lain_ — dan memberi
-   peringatan ⚠️ bila dua HP tak sengaja memilih slot yang sama.
+   slot**: _kosong_, _dipakai kamu_, atau _🔒 dipakai HP lain_. Slot yang
+   sudah dipakai HP lain **terkunci** dan tidak bisa dipilih (server juga
+   menolak bila ada perebutan bersamaan).
 3. Tiap pemain punya **keymap sendiri** dan bisa di-remap terpisah:
    - **Player 1** default: `WASD` + mouse (kamera).
    - **Player 2** default: `IJKL` + tombol angka/huruf lain, **tanpa mouse**
@@ -161,6 +162,25 @@ kiri/kanan untuk menyetir (default dipetakan ke tombol `A`/`D`, bisa di-remap).
 Cocok untuk game balap/mengemudi.
 - iOS akan meminta **izin gerak (Motion)** sekali — ketuk *Allow*.
 - Sumbu & ambang bisa diatur di `keymap.tilt` (`server/keymap.js`).
+
+### 5. Profil mapping per-game 🎚️
+Di pengaturan ada bagian **Profil Game**. Simpan beberapa preset mapping
+(mis. "FPS", "Balapan", "Minecraft") dan **ganti cepat** sesuai game yang
+dimainkan.
+- **+ Buat**: bikin profil baru (menyalin mapping profil aktif sebagai awal).
+- **Pakai**: aktifkan profil — semua iPhone yang terhubung otomatis ikut
+  memuat mapping profil itu.
+- **Hapus**: hapus profil (profil "Default" tidak bisa dihapus).
+- Tiap profil menyimpan mapping **Player 1 & 2** terpisah, dan remap yang kamu
+  lakukan masuk ke profil yang sedang aktif. Tersimpan di `server/profiles.json`.
+
+### 6. Mode Trackpad 🖱
+Pengaturan → **Mode Trackpad** mengubah layar iPhone jadi touchpad presisi:
+- **Geser jari** di area trackpad untuk menggerakkan kursor mouse Mac.
+- **Ketuk** = klik kiri; tombol **Klik Kiri / Klik Kanan** untuk klik & tahan
+  (mis. drag atau klik kanan).
+- Berguna untuk navigasi menu/inventory atau game point-and-click. (Ingat:
+  Mac hanya punya 1 kursor, jadi trackpad menggerakkan kursor yang sama.)
 
 ---
 
@@ -194,9 +214,9 @@ gamepad/
 ├── server/
 │   ├── index.js           # server: HTTP + WebSocket + routing input
 │   ├── inputController.js  # simulasi keyboard & mouse (nut-js / mock)
-│   ├── config.js          # keymap "hidup": default + override remap
-│   ├── keymap.js          # pemetaan tombol P1 & P2  ← edit di sini
-│   └── keymap.user.json    # (otomatis) hasil remap dari iPhone
+│   ├── config.js          # profil mapping (P1 & P2) + simpan/muat
+│   ├── keymap.js          # pemetaan default P1 & P2  ← edit di sini
+│   └── profiles.json       # (otomatis) profil & remap dari iPhone
 └── public/
     ├── index.html         # UI controller + panel pengaturan/remap
     ├── style.css

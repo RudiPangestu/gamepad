@@ -8,7 +8,9 @@ const statusEl = document.getElementById("status");
 
 // --- Pemain (1 atau 2). 0 = belum dipilih. ---------------------------------
 let player = parseInt(localStorage.getItem("player"), 10) || 0;
-let slotCounts = { 1: 0, 2: 0 }; // jumlah HP di tiap slot (dari server)
+let prevPlayer = player;          // untuk revert bila slot ditolak
+let slotCounts = { 1: 0, 2: 0 };  // jumlah HP di tiap slot (dari server)
+let profiles = { active: "Default", names: ["Default"] };
 
 // --- Koneksi WebSocket dengan auto-reconnect ------------------------------
 let ws = null;
@@ -30,12 +32,15 @@ function statusConnected() {
   statusEl.className = player === 2 ? "status ok p2" : "status ok";
 }
 
-// Perbarui badge slot di modal pilih pemain + status bar.
+// Perbarui badge slot di modal pilih pemain + status bar. Slot yang dipakai
+// HP LAIN dikunci (tidak bisa dipilih).
 function renderSlots() {
   for (const s of [1, 2]) {
     const el = document.querySelector(`.pstate[data-state="${s}"]`);
+    const btn = document.querySelector(`.player-btn[data-player="${s}"]`);
     if (!el) continue;
     const count = slotCounts[s] || 0;
+    const lockedByOther = count > 0 && player !== s;
     el.classList.remove("free", "mine", "other");
     if (count === 0) {
       el.textContent = "kosong";
@@ -49,11 +54,24 @@ function renderSlots() {
         el.classList.add("mine");
       }
     } else {
-      el.textContent = count > 1 ? `dipakai (${count} HP)` : "dipakai HP lain";
+      el.textContent = "🔒 dipakai HP lain";
       el.classList.add("other");
     }
+    if (btn) btn.classList.toggle("locked", lockedByOther);
   }
   if (connected && player) statusConnected();
+}
+
+// Server menolak slot (sudah dipakai HP lain) — kembalikan pilihan sebelumnya.
+function onSlotDenied(msg) {
+  alert(`Slot Player ${msg.player} sudah dipakai HP lain. Pilih slot lain.`);
+  slotCounts = msg.counts || slotCounts;
+  // kembalikan ke pilihan sebelumnya (atau minta pilih ulang)
+  player = prevPlayer || 0;
+  if (player) localStorage.setItem("player", String(player));
+  else localStorage.removeItem("player");
+  renderSlots();
+  playerSelectEl.classList.remove("hidden");
 }
 
 function connect() {
@@ -77,6 +95,12 @@ function connect() {
     if (msg.type === "slots") {
       slotCounts = msg.counts || { 1: 0, 2: 0 };
       renderSlots();
+    } else if (msg.type === "slot_denied") {
+      onSlotDenied(msg);
+    } else if (msg.type === "profile") {
+      profiles = msg;
+      renderProfiles();
+      loadKeymap(); // label remap mengikuti profil baru
     }
   };
 
@@ -480,6 +504,7 @@ function refreshToggleUI() {
 
 gearBtn.addEventListener("click", () => {
   if (!keymap) loadKeymap();
+  loadProfiles();
   refreshToggleUI();
   settingsEl.classList.remove("hidden");
 });
@@ -526,6 +551,12 @@ const playerSelectEl = document.getElementById("playerSelect");
 const playerLabelEl = document.getElementById("playerLabel");
 
 function setPlayer(p) {
+  // Tolak bila slot dipakai HP lain (kunci slot di sisi klien).
+  if ((slotCounts[p] || 0) > 0 && player !== p) {
+    alert(`Slot Player ${p} sudah dipakai HP lain. Pilih slot lain.`);
+    return;
+  }
+  prevPlayer = player; // simpan untuk revert jika server menolak
   player = p;
   localStorage.setItem("player", String(p));
   playerSelectEl.classList.add("hidden");
@@ -557,8 +588,189 @@ if (player) {
   playerSelectEl.classList.remove("hidden");
 }
 
-// Muat keymap di awal agar label remap siap.
+// Muat keymap & daftar profil di awal.
 loadKeymap();
+loadProfiles();
+
+// ===========================================================================
+//  PROFIL GAME (preset mapping)
+// ===========================================================================
+const profileListEl = document.getElementById("profileList");
+
+function renderProfiles() {
+  if (!profileListEl) return;
+  profileListEl.innerHTML = "";
+  for (const name of profiles.names) {
+    const active = name === profiles.active;
+    const item = document.createElement("div");
+    item.className = "profile-item" + (active ? " active" : "");
+    const left = document.createElement("span");
+    left.className = "pname";
+    left.textContent = name;
+    const actions = document.createElement("span");
+    actions.className = "pactions";
+    if (active) {
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = "● aktif";
+      actions.appendChild(tag);
+    } else {
+      const use = document.createElement("button");
+      use.className = "use";
+      use.textContent = "Pakai";
+      use.addEventListener("click", () => switchProfile(name));
+      actions.appendChild(use);
+    }
+    if (name !== "Default") {
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "Hapus";
+      del.addEventListener("click", () => deleteProfileFn(name));
+      actions.appendChild(del);
+    }
+    item.appendChild(left);
+    item.appendChild(actions);
+    profileListEl.appendChild(item);
+  }
+}
+
+async function loadProfiles() {
+  try {
+    const res = await fetch("/profiles");
+    profiles = await res.json();
+    renderProfiles();
+  } catch {}
+}
+
+async function switchProfile(name) {
+  try {
+    const res = await fetch("/profiles/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    profiles = await res.json();
+    renderProfiles();
+    loadKeymap();
+    haptic();
+  } catch {}
+}
+
+async function createProfileFn() {
+  const inp = document.getElementById("newProfileName");
+  const name = (inp.value || "").trim();
+  if (!name) return;
+  try {
+    const res = await fetch("/profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, copyActive: true }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    profiles = data;
+    inp.value = "";
+    renderProfiles();
+    loadKeymap();
+  } catch {}
+}
+
+async function deleteProfileFn(name) {
+  if (!confirm(`Hapus profil "${name}"?`)) return;
+  try {
+    const res = await fetch("/profiles/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    profiles = data;
+    renderProfiles();
+    loadKeymap();
+  } catch {}
+}
+
+document.getElementById("createProfile").addEventListener("click", createProfileFn);
+
+// ===========================================================================
+//  MODE TRACKPAD
+// ===========================================================================
+const trackpadEl = document.getElementById("trackpad");
+const tpSurface = document.getElementById("tpSurface");
+const TP_SCALE = 1.7; // kepekaan gerak
+
+document.getElementById("openTrackpad").addEventListener("click", () => {
+  settingsEl.classList.add("hidden");
+  trackpadEl.classList.remove("hidden");
+});
+document.getElementById("closeTrackpad").addEventListener("click", () => {
+  trackpadEl.classList.add("hidden");
+});
+
+(function setupTrackpadSurface() {
+  let tpId = null;
+  let last = null;
+  let startTime = 0;
+  let moved = 0;
+
+  tpSurface.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    if (tpId !== null) return;
+    const t = e.changedTouches[0];
+    tpId = t.identifier;
+    last = { x: t.clientX, y: t.clientY };
+    startTime = Date.now();
+    moved = 0;
+    tpSurface.classList.add("touching");
+  }, { passive: false });
+
+  tpSurface.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== tpId) continue;
+      const dx = t.clientX - last.x;
+      const dy = t.clientY - last.y;
+      last = { x: t.clientX, y: t.clientY };
+      moved += Math.hypot(dx, dy);
+      send({ type: "mouseMove", dx: dx * TP_SCALE, dy: dy * TP_SCALE });
+    }
+  }, { passive: false });
+
+  function end(e) {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== tpId) continue;
+      tpId = null;
+      tpSurface.classList.remove("touching");
+      // Ketukan singkat tanpa banyak gerak = klik kiri.
+      if (moved < 10 && Date.now() - startTime < 250) {
+        haptic();
+        send({ type: "mouseBtn", button: "left", pressed: true });
+        setTimeout(() => send({ type: "mouseBtn", button: "left", pressed: false }), 30);
+      }
+    }
+  }
+  tpSurface.addEventListener("touchend", end);
+  tpSurface.addEventListener("touchcancel", end);
+})();
+
+// Tombol klik kiri/kanan trackpad (tahan = klik ditahan).
+function bindTpClick(id, button) {
+  const el = document.getElementById(id);
+  el.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    haptic();
+    send({ type: "mouseBtn", button, pressed: true });
+  }, { passive: false });
+  const up = (e) => {
+    e.preventDefault();
+    send({ type: "mouseBtn", button, pressed: false });
+  };
+  el.addEventListener("touchend", up);
+  el.addEventListener("touchcancel", up);
+}
+bindTpClick("tpLeft", "left");
+bindTpClick("tpRight", "right");
 
 // Coba minta layar tetap menyala (jika didukung).
 async function keepAwake() {

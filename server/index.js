@@ -18,7 +18,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { input } from "./inputController.js";
-import { getKeymap, applyPatch, resetKeymap } from "./config.js";
+import {
+  getKeymap, applyPatch, resetKeymap,
+  listProfiles, setActiveProfile, createProfile, deleteProfile,
+} from "./config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -48,6 +51,31 @@ app.post("/keymap", (req, res) => {
 // Kembalikan keymap pemain ke default. Body: { player }.
 app.post("/keymap/reset", (req, res) => {
   res.json(resetKeymap(parsePlayer((req.body || {}).player)));
+});
+
+// ---- Profil mapping per-game ----
+app.get("/profiles", (_req, res) => res.json(listProfiles()));
+
+app.post("/profiles/active", (req, res) => {
+  const r = setActiveProfile((req.body || {}).name);
+  if (r.error) return res.status(400).json(r);
+  broadcastProfile();
+  res.json(r);
+});
+
+app.post("/profiles", (req, res) => {
+  const { name, copyActive } = req.body || {};
+  const r = createProfile(name, copyActive !== false);
+  if (r.error) return res.status(400).json(r);
+  broadcastProfile();
+  res.json(r);
+});
+
+app.post("/profiles/delete", (req, res) => {
+  const r = deleteProfile((req.body || {}).name);
+  if (r.error) return res.status(400).json(r);
+  broadcastProfile();
+  res.json(r);
 });
 
 const server = http.createServer(app);
@@ -138,14 +166,35 @@ function computeSlotCounts() {
   return counts;
 }
 
-// Siarkan status slot ke semua iPhone agar bisa menampilkan indikator.
-function broadcastSlots() {
-  const payload = JSON.stringify({ type: "slots", counts: computeSlotCounts() });
+function broadcastJson(obj) {
+  const payload = JSON.stringify(obj);
   for (const c of wss.clients) {
     if (c.readyState === WebSocket.OPEN) {
       try { c.send(payload); } catch {}
     }
   }
+}
+
+// Siarkan status slot ke semua iPhone agar bisa menampilkan indikator.
+function broadcastSlots() {
+  broadcastJson({ type: "slots", counts: computeSlotCounts() });
+}
+
+// Siarkan perubahan profil (mis. ganti profil aktif) agar semua iPhone
+// memuat ulang label keymap-nya.
+function broadcastProfile() {
+  broadcastJson({ type: "profile", ...listProfiles() });
+}
+
+// Apakah slot `p` sudah dipakai koneksi LAIN (bukan ws ini)?
+function isSlotTakenByOther(ws, p) {
+  for (const c of wss.clients) {
+    if (c !== ws && c.readyState === WebSocket.OPEN && c._state &&
+        c._state.helloReceived && c._state.player === p) {
+      return true;
+    }
+  }
+  return false;
 }
 
 wss.on("connection", (ws) => {
@@ -184,7 +233,7 @@ wss.on("connection", (ws) => {
     } catch {
       return;
     }
-    queue = queue.then(() => handleMessage(msg, state)).catch((err) => {
+    queue = queue.then(() => handleMessage(msg, state, ws)).catch((err) => {
       console.error("[ws] error handle:", err?.message || err);
     });
   });
@@ -202,10 +251,20 @@ wss.on("connection", (ws) => {
   ws.on("error", () => {});
 });
 
-async function handleMessage(msg, state) {
+async function handleMessage(msg, state, ws) {
   // Pilihan slot pemain dari iPhone.
   if (msg.type === "hello") {
     const newPlayer = parsePlayer(msg.player);
+    // Kunci slot: tolak bila slot sudah dipakai HP lain.
+    if (isSlotTakenByOther(ws, newPlayer)) {
+      try {
+        ws.send(JSON.stringify({
+          type: "slot_denied", player: newPlayer, counts: computeSlotCounts(),
+        }));
+      } catch {}
+      console.log(`[ws] tolak: slot Player ${newPlayer} sudah dipakai`);
+      return;
+    }
     if (newPlayer !== state.player) {
       // lepas tombol pemetaan lama agar tidak ada yang nyangkut
       state.namespaced.clear();
@@ -263,6 +322,22 @@ async function handleMessage(msg, state) {
       if (msg.x <= -t) desired.push(cfg.left);
       if (msg.x >= t) desired.push(cfg.right);
       await syncNamespaced(state, "tilt", desired);
+      break;
+    }
+
+    case "mouseMove": {
+      // Mode trackpad: gerak relatif jari -> gerak mouse.
+      const dx = Math.round(msg.dx || 0);
+      const dy = Math.round(msg.dy || 0);
+      await state.io.moveMouseBy(dx, dy);
+      break;
+    }
+
+    case "mouseBtn": {
+      // Mode trackpad: klik. msg: { button:'left'|'right', pressed:bool }
+      const btn = msg.button === "right" ? "right" : "left";
+      if (msg.pressed) await state.io.pressMouse(btn);
+      else await state.io.releaseMouse(btn);
       break;
     }
 
