@@ -15,6 +15,23 @@
   <div id="status" class="status">Menghubungkan…</div>
   <button id="gear" class="gear" aria-label="Pengaturan">⚙︎</button>
 
+  <!-- ===== Pilih Pemain ===== -->
+  <div id="playerSelect" class="overlay">
+    <div class="sheet player-pick">
+      <h2>Pilih Pemain</h2>
+      <p class="hint">Tiap iPhone memilih slot berbeda. Game harus mendukung 2
+        pemain di satu keyboard.</p>
+      <div class="player-btns">
+        <button class="player-btn p1" data-player="1">
+          <span class="pnum">P1</span><span class="pdesc">Player 1<br>WASD + mouse</span>
+        </button>
+        <button class="player-btn p2" data-player="2">
+          <span class="pnum">P2</span><span class="pdesc">Player 2<br>IJKL (tanpa mouse)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="pad">
     <!-- Kiri: stik kiri + d-pad -->
     <div class="side left">
@@ -67,6 +84,11 @@
       <div class="sheet-head">
         <h2>Pengaturan</h2>
         <button id="closeSettings" class="x">✕</button>
+      </div>
+
+      <div class="row toggle-row">
+        <span>Pemain saat ini: <b id="playerLabel">P1</b></span>
+        <button id="changePlayer" class="toggle">Ganti</button>
       </div>
 
       <div class="row toggle-row">

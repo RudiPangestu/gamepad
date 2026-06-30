@@ -1,27 +1,28 @@
 // config.js
 // ----------------------------------------------------------------------------
-// Mengelola keymap "hidup": gabungan dari default (keymap.js) + override yang
-// disimpan user lewat remap di layar iPhone (keymap.user.json).
+// Mengelola keymap "hidup" PER PEMAIN (1 & 2): gabungan default (keymap.js) +
+// override yang disimpan user lewat remap di layar iPhone (keymap.user.json).
 //
-//  - getKeymap()  : keymap efektif saat ini
-//  - applyPatch() : deep-merge sebagian keymap, simpan ke disk, langsung aktif
-//  - resetKeymap(): kembali ke default & hapus file override
+//  - getKeymap(player)       : keymap efektif pemain tsb
+//  - applyPatch(player,patch): deep-merge sebagian keymap pemain, simpan, aktif
+//  - resetKeymap(player)     : kembalikan pemain tsb ke default
+//
+// Format keymap.user.json: { "1": <diff P1>, "2": <diff P2> }
 // ----------------------------------------------------------------------------
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { keymap as defaults } from "./keymap.js";
+import { defaultKeymaps } from "./keymap.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_FILE = path.join(__dirname, "keymap.user.json");
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
-
-// Deep-merge: nilai object di-merge rekursif, selain itu di-replace.
-const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 function deepMerge(target, patch) {
   for (const key of Object.keys(patch)) {
@@ -39,44 +40,63 @@ function deepMerge(target, patch) {
   return target;
 }
 
-let current = deepClone(defaults);
+function normalizePlayer(player) {
+  return player === 2 || player === "2" ? 2 : 1;
+}
+
+// Keymap hidup per pemain.
+const current = {
+  1: deepClone(defaultKeymaps[1]),
+  2: deepClone(defaultKeymaps[2]),
+};
 
 function loadUserOverrides() {
   try {
-    if (fs.existsSync(USER_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(USER_FILE, "utf8"));
-      deepMerge(current, raw);
-      console.log("[config] override user dimuat dari keymap.user.json");
+    if (!fs.existsSync(USER_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(USER_FILE, "utf8"));
+    for (const p of [1, 2]) {
+      if (raw[p]) deepMerge(current[p], raw[p]);
     }
+    console.log("[config] override user dimuat dari keymap.user.json");
   } catch (err) {
     console.warn("[config] gagal memuat keymap.user.json:", err?.message || err);
   }
 }
 loadUserOverrides();
 
-export function getKeymap() {
-  return current;
+export function getKeymap(player = 1) {
+  return current[normalizePlayer(player)];
 }
 
-// Patch = bagian keymap yang berubah (mis. { buttons: { a: { type, value } } }).
-export function applyPatch(patch) {
-  deepMerge(current, patch);
+export function applyPatch(player, patch) {
+  const p = normalizePlayer(player);
+  deepMerge(current[p], patch);
+  saveOverrides();
+  return current[p];
+}
+
+export function resetKeymap(player) {
+  const p = normalizePlayer(player);
+  current[p] = deepClone(defaultKeymaps[p]);
+  saveOverrides();
+  return current[p];
+}
+
+function saveOverrides() {
   try {
-    // Simpan SELISIH terhadap default supaya file tetap minimal & rapi.
-    const diff = diffFromDefaults(current, defaults);
-    fs.writeFileSync(USER_FILE, JSON.stringify(diff, null, 2));
+    const diff = {};
+    for (const p of [1, 2]) {
+      const d = diffFromDefaults(current[p], defaultKeymaps[p]);
+      if (Object.keys(d).length) diff[p] = d;
+    }
+    if (Object.keys(diff).length === 0) {
+      if (fs.existsSync(USER_FILE)) fs.unlinkSync(USER_FILE);
+    } else {
+      fs.writeFileSync(USER_FILE, JSON.stringify(diff, null, 2));
+    }
   } catch (err) {
     console.warn("[config] gagal menyimpan override:", err?.message || err);
   }
-  return current;
-}
-
-export function resetKeymap() {
-  current = deepClone(defaults);
-  try {
-    if (fs.existsSync(USER_FILE)) fs.unlinkSync(USER_FILE);
-  } catch {}
-  return current;
 }
 
 // Hitung bagian `cur` yang berbeda dari `def` (rekursif).

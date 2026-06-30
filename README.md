@@ -28,8 +28,9 @@ hampir semua game di macOS yang memakai kontrol WASD + mouse.
   gunakan tombol/d-pad untuk aksi lain, atau remap sesuai kebutuhan.
 - **Getaran di iPhone:** iOS Safari tidak punya API getaran resmi; efek haptic
   bersifat _best-effort_ dan bisa saja tidak terasa (lihat bagian Fitur).
-- **Satu controller:** dirancang untuk satu iPhone. Menyambungkan beberapa
-  iPhone sekaligus belum didukung.
+- **2 pemain butuh dukungan game:** bisa 2 iPhone sekaligus (Player 1 & 2),
+  tapi game-nya harus mendukung 2 pemain di satu keyboard. Lihat bagian
+  "Main berdua (2 pemain)".
 
 ## ⚙️ Kenapa pakai keyboard/mouse, bukan "gamepad asli"?
 
@@ -137,7 +138,22 @@ Perubahan langsung dikirim ke Mac dan **tersimpan** di `server/keymap.user.json`
 sehingga tetap ada setelah server di-restart. Tombol **Kembalikan ke Default**
 menghapus semua perubahan.
 
-### 3. Setir dengan kemiringan (Tilt / Gyroscope)
+### 3. Main berdua (2 pemain) 👥
+Bisa 2 iPhone sekaligus jadi Player 1 & Player 2.
+1. Buka alamat server di **kedua** iPhone (WiFi sama).
+2. Tiap iPhone memilih slot: **Player 1** atau **Player 2** (bisa diganti
+   kapan saja lewat ⚙︎ → "Ganti").
+3. Tiap pemain punya **keymap sendiri** dan bisa di-remap terpisah:
+   - **Player 1** default: `WASD` + mouse (kamera).
+   - **Player 2** default: `IJKL` + tombol angka/huruf lain, **tanpa mouse**
+     (Mac hanya punya 1 kursor).
+
+> ⚠️ **Penting:** ini hanya berguna kalau **game-nya mendukung 2 pemain di satu
+> keyboard** (Player 1 satu set tombol, Player 2 set lain). Sesuaikan tombol
+> tiap pemain lewat menu remap agar cocok dengan pengaturan game kamu. Edit
+> default-nya di `server/keymap.js` (`keymap` untuk P1, `keymap2` untuk P2).
+
+### 4. Setir dengan kemiringan (Tilt / Gyroscope)
 Aktifkan **"Setir dengan kemiringan"** di pengaturan, lalu miringkan iPhone
 kiri/kanan untuk menyetir (default dipetakan ke tombol `A`/`D`, bisa di-remap).
 Cocok untuk game balap/mengemudi.
@@ -177,7 +193,7 @@ gamepad/
 │   ├── index.js           # server: HTTP + WebSocket + routing input
 │   ├── inputController.js  # simulasi keyboard & mouse (nut-js / mock)
 │   ├── config.js          # keymap "hidup": default + override remap
-│   ├── keymap.js          # konfigurasi pemetaan tombol  ← edit di sini
+│   ├── keymap.js          # pemetaan tombol P1 & P2  ← edit di sini
 │   └── keymap.user.json    # (otomatis) hasil remap dari iPhone
 └── public/
     ├── index.html         # UI controller + panel pengaturan/remap

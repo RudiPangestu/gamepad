@@ -6,6 +6,9 @@
 
 const statusEl = document.getElementById("status");
 
+// --- Pemain (1 atau 2). 0 = belum dipilih. ---------------------------------
+let player = parseInt(localStorage.getItem("player"), 10) || 0;
+
 // --- Koneksi WebSocket dengan auto-reconnect ------------------------------
 let ws = null;
 let connected = false;
@@ -15,13 +18,24 @@ function wsUrl() {
   return `${proto}://${location.host}`;
 }
 
+function statusConnected() {
+  statusEl.textContent = `🎮 P${player} Terhubung`;
+  statusEl.className = player === 2 ? "status ok p2" : "status ok";
+}
+
 function connect() {
   ws = new WebSocket(wsUrl());
 
   ws.onopen = () => {
     connected = true;
-    statusEl.textContent = "🎮 Terhubung";
-    statusEl.className = "status ok";
+    // Beritahu server slot pemain (jika sudah dipilih).
+    if (player) {
+      send({ type: "hello", player });
+      statusConnected();
+    } else {
+      statusEl.textContent = "🎮 Terhubung";
+      statusEl.className = "status ok";
+    }
   };
 
   ws.onclose = () => {
@@ -300,10 +314,11 @@ const REMAP = [
 ];
 
 const KEY_OPTS = [
-  "w", "a", "s", "d", "e", "q", "r", "f", "c", "v",
+  "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+  "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
   "space", "enter", "escape", "tab", "shift", "control", "alt",
   "up", "down", "left", "right",
-  "1", "2", "3", "4", "5",
+  "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
 ];
 const MOUSE_OPTS = [
   { value: "left", label: "🖱 Kiri" },
@@ -386,7 +401,7 @@ async function chooseAction(value, type) {
     await fetch("/keymap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
+      body: JSON.stringify({ player: player || 1, patch }),
     });
   } catch {}
 }
@@ -407,7 +422,7 @@ function deepMergeLocal(target, patch) {
 
 async function loadKeymap() {
   try {
-    const res = await fetch("/keymap");
+    const res = await fetch(`/keymap?player=${player || 1}`);
     keymap = await res.json();
     renderRemapList();
   } catch {}
@@ -452,11 +467,51 @@ tiltToggle.addEventListener("click", async () => {
 
 document.getElementById("resetMap").addEventListener("click", async () => {
   try {
-    const res = await fetch("/keymap/reset", { method: "POST" });
+    const res = await fetch("/keymap/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player: player || 1 }),
+    });
     keymap = await res.json();
     renderRemapList();
   } catch {}
 });
+
+// ===========================================================================
+//  PILIH / GANTI PEMAIN
+// ===========================================================================
+const playerSelectEl = document.getElementById("playerSelect");
+const playerLabelEl = document.getElementById("playerLabel");
+
+function setPlayer(p) {
+  player = p;
+  localStorage.setItem("player", String(p));
+  playerSelectEl.classList.add("hidden");
+  if (playerLabelEl) playerLabelEl.textContent = `P${p}`;
+  if (connected) {
+    send({ type: "hello", player: p });
+    statusConnected();
+  }
+  loadKeymap(); // muat keymap pemain ini
+}
+
+document.querySelectorAll(".player-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setPlayer(parseInt(btn.dataset.player, 10)));
+});
+
+// Tombol "Ganti" di pengaturan -> buka lagi modal pilih pemain.
+document.getElementById("changePlayer").addEventListener("click", () => {
+  settingsEl.classList.add("hidden");
+  playerSelectEl.classList.remove("hidden");
+});
+
+// Tampilkan modal pilih pemain bila belum memilih; jika sudah, sembunyikan.
+if (player) {
+  playerSelectEl.classList.add("hidden");
+  if (playerLabelEl) playerLabelEl.textContent = `P${player}`;
+} else {
+  playerSelectEl.classList.remove("hidden");
+}
 
 // Muat keymap di awal agar label remap siap.
 loadKeymap();

@@ -4,6 +4,10 @@
 //   1. Menyajikan halaman controller (web) ke iPhone lewat WiFi.
 //   2. Menerima input controller via WebSocket dengan latensi rendah.
 //   3. Menerjemahkan input -> keyboard & mouse (lihat inputController.js).
+//
+// Mendukung 2 pemain: tiap iPhone memilih slot Player 1 / Player 2, dan tiap
+// pemain punya keymap sendiri. State input dipisah per koneksi sehingga 2
+// controller tidak saling mengganggu.
 // ----------------------------------------------------------------------------
 
 import express from "express";
@@ -23,27 +27,74 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Kirim keymap efektif saat ini ke client (untuk label & layar remap).
-app.get("/keymap", (_req, res) => res.json(getKeymap()));
+function parsePlayer(v) {
+  return v === 2 || v === "2" ? 2 : 1;
+}
 
-// Simpan perubahan remap dari layar iPhone (patch sebagian keymap).
+// Kirim keymap efektif pemain tertentu (untuk label & layar remap).
+app.get("/keymap", (req, res) => res.json(getKeymap(parsePlayer(req.query.player))));
+
+// Simpan perubahan remap dari iPhone. Body: { player, patch }.
 app.post("/keymap", (req, res) => {
-  const patch = req.body;
+  const { player, patch } = req.body || {};
   if (!patch || typeof patch !== "object") {
     return res.status(400).json({ error: "patch tidak valid" });
   }
-  const updated = applyPatch(patch);
-  console.log("[config] keymap diperbarui via remap iPhone");
+  const updated = applyPatch(parsePlayer(player), patch);
+  console.log(`[config] keymap Player ${parsePlayer(player)} diperbarui via remap`);
   res.json(updated);
 });
 
-// Kembalikan keymap ke default.
-app.post("/keymap/reset", (_req, res) => {
-  res.json(resetKeymap());
+// Kembalikan keymap pemain ke default. Body: { player }.
+app.post("/keymap/reset", (req, res) => {
+  res.json(resetKeymap(parsePlayer((req.body || {}).player)));
 });
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+// --- Sesi input PER KONEKSI ------------------------------------------------
+// Melacak tombol/mouse yang ditahan koneksi ini, agar saat putus hanya melepas
+// miliknya sendiri (bukan milik pemain lain). Lapisan fisik (inputController)
+// tetap ref-counted, jadi aman bila kedua pemain menekan tombol yang sama.
+function makeSession() {
+  const keyCounts = new Map();
+  const mouseCounts = new Map();
+  return {
+    async pressKey(k) {
+      keyCounts.set(k, (keyCounts.get(k) || 0) + 1);
+      await input.pressKey(k);
+    },
+    async releaseKey(k) {
+      const c = keyCounts.get(k) || 0;
+      if (c <= 0) return;
+      if (c === 1) keyCounts.delete(k);
+      else keyCounts.set(k, c - 1);
+      await input.releaseKey(k);
+    },
+    async pressMouse(m) {
+      mouseCounts.set(m, (mouseCounts.get(m) || 0) + 1);
+      await input.pressMouse(m);
+    },
+    async releaseMouse(m) {
+      const c = mouseCounts.get(m) || 0;
+      if (c <= 0) return;
+      if (c === 1) mouseCounts.delete(m);
+      else mouseCounts.set(m, c - 1);
+      await input.releaseMouse(m);
+    },
+    async moveMouseBy(dx, dy) {
+      await input.moveMouseBy(dx, dy);
+    },
+    // Lepas semua yang ditahan koneksi ini.
+    async releaseAll() {
+      for (const [k, c] of keyCounts) for (let i = 0; i < c; i++) await input.releaseKey(k);
+      keyCounts.clear();
+      for (const [m, c] of mouseCounts) for (let i = 0; i < c; i++) await input.releaseMouse(m);
+      mouseCounts.clear();
+    },
+  };
+}
 
 // --- Logika penerjemahan stik analog -> tombol ----------------------------
 function stickToKeys(stick, cfg) {
@@ -56,134 +107,146 @@ function stickToKeys(stick, cfg) {
   return keys;
 }
 
-// State per koneksi
+// Sinkronisasi tombol per-namespace, per-koneksi (mis. "lstick", "tilt").
+async function syncNamespaced(state, ns, desired) {
+  const prev = state.namespaced.get(ns) || new Set();
+  const next = new Set(desired);
+  for (const k of prev) if (!next.has(k)) await state.io.releaseKey(k);
+  for (const k of next) if (!prev.has(k)) await state.io.pressKey(k);
+  state.namespaced.set(ns, next);
+}
+
 function createSessionState() {
   return {
+    player: 1,
     rightStick: { x: 0, y: 0 },
     mouseLoop: null,
+    namespaced: new Map(),
+    io: makeSession(),
   };
 }
 
-wss.on("connection", (ws) => {
-  console.log("[ws] controller terhubung");
-  const state = createSessionState();
+const connectedPlayers = new Set();
 
-  // Loop gerak mouse untuk stik kanan (mode mouse) — halus & terus menerus.
-  // `moving` mencegah tick saling tumpang-tindih bila operasi mouse lambat.
+wss.on("connection", (ws) => {
+  const state = createSessionState();
+  console.log("[ws] controller terhubung (menunggu pilihan pemain)");
+
+  // Loop gerak mouse untuk stik kanan (mode mouse). Hanya berarti untuk pemain
+  // yang memakai mode mouse (default Player 1).
   let moving = false;
   state.mouseLoop = setInterval(async () => {
     if (moving) return;
-    const cfg = getKeymap().rightStick;
+    const cfg = getKeymap(state.player).rightStick;
     if (cfg.mode !== "mouse") return;
     const { x, y } = state.rightStick;
     const t = cfg.threshold ?? 0.18;
-    const mag = Math.hypot(x, y);
-    if (mag < t) return;
+    if (Math.hypot(x, y) < t) return;
     const s = cfg.sensitivity ?? 16;
     moving = true;
     try {
-      await input.moveMouseBy(Math.round(x * s), Math.round(y * s));
+      await state.io.moveMouseBy(Math.round(x * s), Math.round(y * s));
     } finally {
       moving = false;
     }
-  }, 16); // ~60 fps
+  }, 16);
 
-  ws.on("message", async (raw) => {
+  // Pesan diproses BERURUTAN per koneksi (antrian promise). Tanpa ini, handler
+  // async bisa saling menyela di titik `await` — mis. input bisa diproses
+  // sebelum `hello` selesai menetapkan slot pemain.
+  let queue = Promise.resolve();
+  ws.on("message", (raw) => {
     let msg;
     try {
       msg = JSON.parse(raw.toString());
     } catch {
       return;
     }
-
-    try {
-      await handleMessage(msg, state);
-    } catch (err) {
+    queue = queue.then(() => handleMessage(msg, state)).catch((err) => {
       console.error("[ws] error handle:", err?.message || err);
-    }
+    });
   });
 
   ws.on("close", async () => {
-    console.log("[ws] controller terputus");
     if (state.mouseLoop) clearInterval(state.mouseLoop);
     state.rightStick = { x: 0, y: 0 };
-    namespaced.clear();
-    await input.releaseAll();
+    try { await queue; } catch {} // tunggu pesan tersisa selesai diproses
+    state.namespaced.clear();
+    await state.io.releaseAll();
+    connectedPlayers.delete(state.player);
+    console.log(`[ws] Player ${state.player} terputus`);
   });
 
   ws.on("error", () => {});
 });
 
 async function handleMessage(msg, state) {
-  const keymap = getKeymap();
+  // Pilihan slot pemain dari iPhone.
+  if (msg.type === "hello") {
+    const newPlayer = parsePlayer(msg.player);
+    if (newPlayer !== state.player) {
+      // lepas tombol pemetaan lama agar tidak ada yang nyangkut
+      state.namespaced.clear();
+      await state.io.releaseAll();
+      connectedPlayers.delete(state.player);
+      state.player = newPlayer;
+    }
+    connectedPlayers.add(state.player);
+    console.log(`[ws] -> Player ${state.player} terhubung`);
+    return;
+  }
+
+  const keymap = getKeymap(state.player);
   switch (msg.type) {
     case "stick": {
-      // msg: { type:'stick', side:'left'|'right', x, y }
       if (msg.side === "left") {
-        const desired = stickToKeys({ x: msg.x, y: msg.y }, keymap.leftStick);
-        await syncNamespaced("lstick", desired);
+        await syncNamespaced(state, "lstick", stickToKeys({ x: msg.x, y: msg.y }, keymap.leftStick));
       } else if (msg.side === "right") {
         const cfg = keymap.rightStick;
         if (cfg.mode === "mouse") {
           state.rightStick = { x: msg.x, y: msg.y };
         } else {
-          const desired = stickToKeys({ x: msg.x, y: msg.y }, cfg);
-          // gunakan prefix supaya tidak bentrok dgn key stik kiri yang sama
-          await syncNamespaced("rstick", desired);
+          await syncNamespaced(state, "rstick", stickToKeys({ x: msg.x, y: msg.y }, cfg));
         }
       }
       break;
     }
 
     case "dpad": {
-      // msg: { type:'dpad', dir:'up'|'down'|'left'|'right', pressed:bool }
       const key = keymap.dpad[msg.dir];
       if (!key) break;
-      if (msg.pressed) await input.pressKey(key);
-      else await input.releaseKey(key);
+      if (msg.pressed) await state.io.pressKey(key);
+      else await state.io.releaseKey(key);
       break;
     }
 
     case "button": {
-      // msg: { type:'button', name:'a'|'b'|..., pressed:bool }
       const mapping = keymap.buttons[msg.name];
       if (!mapping) break;
       if (mapping.type === "key") {
-        if (msg.pressed) await input.pressKey(mapping.value);
-        else await input.releaseKey(mapping.value);
+        if (msg.pressed) await state.io.pressKey(mapping.value);
+        else await state.io.releaseKey(mapping.value);
       } else if (mapping.type === "mouse") {
-        if (msg.pressed) await input.pressMouse(mapping.value);
-        else await input.releaseMouse(mapping.value);
+        if (msg.pressed) await state.io.pressMouse(mapping.value);
+        else await state.io.releaseMouse(mapping.value);
       }
       break;
     }
 
     case "tilt": {
-      // msg: { type:'tilt', x }  (x: -1..1, hasil kemiringan kiri-kanan)
       const cfg = keymap.tilt;
       if (!cfg || !cfg.enabled) break;
       const desired = [];
       const t = cfg.threshold ?? 0.25;
       if (msg.x <= -t) desired.push(cfg.left);
       if (msg.x >= t) desired.push(cfg.right);
-      await syncNamespaced("tilt", desired);
+      await syncNamespaced(state, "tilt", desired);
       break;
     }
 
     case "ping":
       break;
   }
-}
-
-// Sinkronisasi key dengan namespace agar stik kiri & kanan tidak saling
-// melepas tombol satu sama lain bila kebetulan memetakan key yang sama.
-const namespaced = new Map();
-async function syncNamespaced(ns, desired) {
-  const prev = namespaced.get(ns) || new Set();
-  const next = new Set(desired);
-  for (const k of prev) if (!next.has(k)) await input.releaseKey(k);
-  for (const k of next) if (!prev.has(k)) await input.pressKey(k);
-  namespaced.set(ns, next);
 }
 
 // --- Util: cari alamat IP LAN untuk ditampilkan ---------------------------
@@ -203,7 +266,7 @@ await input.init();
 server.listen(PORT, "0.0.0.0", () => {
   const ips = getLanIps();
   console.log("\n==========================================================");
-  console.log("  🎮  iPhone -> Mac Gamepad server berjalan");
+  console.log("  🎮  iPhone -> Mac Gamepad server berjalan (2 pemain)");
   console.log("  Mode input :", input.mode === "native" ? "NATIVE (keyboard+mouse aktif)" : "MOCK (hanya log)");
   console.log("----------------------------------------------------------");
   console.log("  Buka di Safari iPhone (WiFi yang sama dgn Mac):");

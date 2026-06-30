@@ -46,12 +46,17 @@ function toKey(name) {
   if (!nut) return null;
   const Key = nut.Key;
   const map = {
-    w: Key.W, a: Key.A, s: Key.S, d: Key.D,
-    e: Key.E, q: Key.Q, r: Key.R, f: Key.F, c: Key.C, v: Key.V,
+    // seluruh alfabet
+    a: Key.A, b: Key.B, c: Key.C, d: Key.D, e: Key.E, f: Key.F, g: Key.G,
+    h: Key.H, i: Key.I, j: Key.J, k: Key.K, l: Key.L, m: Key.M, n: Key.N,
+    o: Key.O, p: Key.P, q: Key.Q, r: Key.R, s: Key.S, t: Key.T, u: Key.U,
+    v: Key.V, w: Key.W, x: Key.X, y: Key.Y, z: Key.Z,
+    // kontrol
     space: Key.Space, enter: Key.Enter, escape: Key.Escape, tab: Key.Tab,
     shift: Key.LeftShift, control: Key.LeftControl, alt: Key.LeftAlt,
     up: Key.Up, down: Key.Down, left: Key.Left, right: Key.Right,
-    "1": Key.Num1, "2": Key.Num2, "3": Key.Num3, "4": Key.Num4,
+    // angka
+    "0": Key.Num0, "1": Key.Num1, "2": Key.Num2, "3": Key.Num3, "4": Key.Num4,
     "5": Key.Num5, "6": Key.Num6, "7": Key.Num7, "8": Key.Num8, "9": Key.Num9,
   };
   return map[name] ?? null;
@@ -70,7 +75,7 @@ function toMouseButton(name) {
 // (mis. stik kiri & tilt yang sama-sama memetakan "a") bisa menahan tombol
 // yang sama tanpa saling melepas: tombol fisik baru dilepas saat hitungan 0.
 const heldKeys = new Map();
-const heldMouse = new Set();
+const heldMouse = new Map();
 
 export const input = {
   get mode() {
@@ -110,8 +115,9 @@ export const input = {
   },
 
   async pressMouse(name) {
-    if (heldMouse.has(name)) return;
-    heldMouse.add(name);
+    const count = heldMouse.get(name) || 0;
+    heldMouse.set(name, count + 1);
+    if (count > 0) return;
     if (mode === "native") {
       const b = toMouseButton(name);
       if (b != null) await nut.mouse.pressButton(b);
@@ -121,7 +127,12 @@ export const input = {
   },
 
   async releaseMouse(name) {
-    if (!heldMouse.has(name)) return;
+    const count = heldMouse.get(name) || 0;
+    if (count === 0) return;
+    if (count > 1) {
+      heldMouse.set(name, count - 1);
+      return;
+    }
     heldMouse.delete(name);
     if (mode === "native") {
       const b = toMouseButton(name);
@@ -155,7 +166,15 @@ export const input = {
       }
     }
     heldKeys.clear();
-    for (const m of [...heldMouse]) await this.releaseMouse(m);
+    for (const name of [...heldMouse.keys()]) {
+      if (mode === "native") {
+        const b = toMouseButton(name);
+        if (b != null) await nut.mouse.releaseButton(b);
+      } else {
+        console.log(`[mock] releaseMouse ${name}`);
+      }
+    }
+    heldMouse.clear();
   },
 
   // Tekan lalu lepas (untuk d-pad/tombol pulse jika diperlukan).
