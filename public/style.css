@@ -143,6 +143,14 @@ body.editing { } /* kontrol dinonaktifkan via JS saat editing */
 }
 .overlay.hidden { display: none; }
 
+/* Izinkan scroll vertikal di dalam panel (reset di atas mematikan semua
+   gesture lewat touch-action:none). Tanpa ini panel pengaturan tak bisa
+   di-scroll sehingga bagian remap di bawah tak terjangkau. */
+.sheet,
+.sheet * {
+  touch-action: pan-y;
+}
+
 .sheet {
   width: 100%;
   max-width: 460px;
