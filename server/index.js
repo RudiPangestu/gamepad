@@ -14,16 +14,33 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { input } from "./inputController.js";
-import { keymap } from "./keymap.js";
+import { getKeymap, applyPatch, resetKeymap } from "./config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
 
 const app = express();
+app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Kirim keymap ke client agar bisa menampilkan label tombol.
-app.get("/keymap", (_req, res) => res.json(keymap));
+// Kirim keymap efektif saat ini ke client (untuk label & layar remap).
+app.get("/keymap", (_req, res) => res.json(getKeymap()));
+
+// Simpan perubahan remap dari layar iPhone (patch sebagian keymap).
+app.post("/keymap", (req, res) => {
+  const patch = req.body;
+  if (!patch || typeof patch !== "object") {
+    return res.status(400).json({ error: "patch tidak valid" });
+  }
+  const updated = applyPatch(patch);
+  console.log("[config] keymap diperbarui via remap iPhone");
+  res.json(updated);
+});
+
+// Kembalikan keymap ke default.
+app.post("/keymap/reset", (_req, res) => {
+  res.json(resetKeymap());
+});
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -53,7 +70,7 @@ wss.on("connection", (ws) => {
 
   // Loop gerak mouse untuk stik kanan (mode mouse) — halus & terus menerus.
   state.mouseLoop = setInterval(async () => {
-    const cfg = keymap.rightStick;
+    const cfg = getKeymap().rightStick;
     if (cfg.mode !== "mouse") return;
     const { x, y } = state.rightStick;
     const t = cfg.threshold ?? 0.18;
@@ -82,6 +99,7 @@ wss.on("connection", (ws) => {
     console.log("[ws] controller terputus");
     if (state.mouseLoop) clearInterval(state.mouseLoop);
     state.rightStick = { x: 0, y: 0 };
+    namespaced.clear();
     await input.releaseAll();
   });
 
@@ -89,12 +107,13 @@ wss.on("connection", (ws) => {
 });
 
 async function handleMessage(msg, state) {
+  const keymap = getKeymap();
   switch (msg.type) {
     case "stick": {
       // msg: { type:'stick', side:'left'|'right', x, y }
       if (msg.side === "left") {
         const desired = stickToKeys({ x: msg.x, y: msg.y }, keymap.leftStick);
-        await input.syncKeys(desired);
+        await syncNamespaced("lstick", desired);
       } else if (msg.side === "right") {
         const cfg = keymap.rightStick;
         if (cfg.mode === "mouse") {
@@ -128,6 +147,18 @@ async function handleMessage(msg, state) {
         if (msg.pressed) await input.pressMouse(mapping.value);
         else await input.releaseMouse(mapping.value);
       }
+      break;
+    }
+
+    case "tilt": {
+      // msg: { type:'tilt', x }  (x: -1..1, hasil kemiringan kiri-kanan)
+      const cfg = keymap.tilt;
+      if (!cfg || !cfg.enabled) break;
+      const desired = [];
+      const t = cfg.threshold ?? 0.25;
+      if (msg.x <= -t) desired.push(cfg.left);
+      if (msg.x >= t) desired.push(cfg.right);
+      await syncNamespaced("tilt", desired);
       break;
     }
 

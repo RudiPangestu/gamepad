@@ -130,6 +130,7 @@ function bindButton(el, onDown, onUp) {
   el.addEventListener("touchstart", (e) => {
     e.preventDefault();
     el.classList.add("active");
+    haptic();
     onDown();
   }, { passive: false });
 
@@ -161,6 +162,298 @@ document.querySelectorAll("[data-dpad]").forEach((el) => {
     () => send({ type: "dpad", dir, pressed: false })
   );
 });
+
+// ===========================================================================
+//  HAPTIC / GETARAN
+// ===========================================================================
+// iOS Safari TIDAK mendukung navigator.vibrate. Sebagai gantinya dipakai trik
+// label + <input switch> yang memicu haptic halus di iOS 17.4+. Di Android
+// dipakai navigator.vibrate biasa. Bila keduanya gagal, fungsi ini no-op.
+let hapticsEnabled = localStorage.getItem("haptics") !== "off";
+
+let iosHapticLabel = null;
+function buildIosHaptic() {
+  const label = document.createElement("label");
+  label.style.cssText = "position:absolute;opacity:0;pointer-events:none;";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.setAttribute("switch", "");
+  label.appendChild(input);
+  document.body.appendChild(label);
+  iosHapticLabel = label;
+}
+buildIosHaptic();
+
+function haptic() {
+  if (!hapticsEnabled) return;
+  try {
+    if (navigator.vibrate) navigator.vibrate(12);
+  } catch {}
+  try {
+    if (iosHapticLabel) iosHapticLabel.click(); // best-effort iOS
+  } catch {}
+}
+
+// ===========================================================================
+//  TILT / GYROSCOPE (setir dengan kemiringan)
+// ===========================================================================
+let tiltEnabled = false;
+let lastTiltSent = 0;
+
+function screenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === "number") {
+    return screen.orientation.angle;
+  }
+  if (typeof window.orientation === "number") return window.orientation;
+  return 0;
+}
+
+function handleOrientation(e) {
+  if (!tiltEnabled) return;
+  const beta = e.beta || 0;   // depan-belakang
+  const gamma = e.gamma || 0; // kiri-kanan
+  const angle = screenAngle();
+
+  // Saat landscape, sumbu setir = beta (tanda tergantung sisi landscape).
+  let raw;
+  if (angle === 90) raw = -beta;
+  else if (angle === -90 || angle === 270) raw = beta;
+  else raw = gamma; // portrait fallback
+
+  // ~35° = belok penuh.
+  const x = Math.max(-1, Math.min(1, raw / 35));
+
+  const now = Date.now();
+  if (now - lastTiltSent > 60) {
+    lastTiltSent = now;
+    send({ type: "tilt", x: +x.toFixed(2) });
+  }
+}
+window.addEventListener("deviceorientation", handleOrientation);
+
+async function enableTilt() {
+  // iOS 13+ butuh izin eksplisit lewat gesture pengguna.
+  try {
+    if (
+      typeof DeviceOrientationEvent !== "undefined" &&
+      typeof DeviceOrientationEvent.requestPermission === "function"
+    ) {
+      const res = await DeviceOrientationEvent.requestPermission();
+      if (res !== "granted") {
+        alert("Izin gerak (Motion) ditolak. Tilt tidak bisa aktif.");
+        return false;
+      }
+    }
+    tiltEnabled = true;
+    return true;
+  } catch {
+    alert("Perangkat tidak mendukung sensor gerak.");
+    return false;
+  }
+}
+function disableTilt() {
+  tiltEnabled = false;
+  send({ type: "tilt", x: 0 }); // lepas setir
+}
+
+// ===========================================================================
+//  PANEL PENGATURAN + REMAP
+// ===========================================================================
+const gearBtn = document.getElementById("gear");
+const settingsEl = document.getElementById("settings");
+const pickerEl = document.getElementById("picker");
+const hapticsToggle = document.getElementById("hapticsToggle");
+const tiltToggle = document.getElementById("tiltToggle");
+const remapListEl = document.getElementById("remapList");
+const keyGridEl = document.getElementById("keyGrid");
+const pickerTitle = document.getElementById("pickerTitle");
+
+let keymap = null; // keymap efektif dari server
+
+// Kontrol yang bisa di-remap. kind 'button' => {type,value}; 'plainkey' => string.
+const REMAP = [
+  { label: "A", path: ["buttons", "a"], kind: "button" },
+  { label: "B", path: ["buttons", "b"], kind: "button" },
+  { label: "X", path: ["buttons", "x"], kind: "button" },
+  { label: "Y", path: ["buttons", "y"], kind: "button" },
+  { label: "L1", path: ["buttons", "l1"], kind: "button" },
+  { label: "R1", path: ["buttons", "r1"], kind: "button" },
+  { label: "L2", path: ["buttons", "l2"], kind: "button" },
+  { label: "R2", path: ["buttons", "r2"], kind: "button" },
+  { label: "Start", path: ["buttons", "start"], kind: "button" },
+  { label: "Select", path: ["buttons", "select"], kind: "button" },
+  { label: "D-pad ↑", path: ["dpad", "up"], kind: "plainkey" },
+  { label: "D-pad ↓", path: ["dpad", "down"], kind: "plainkey" },
+  { label: "D-pad ◀", path: ["dpad", "left"], kind: "plainkey" },
+  { label: "D-pad ▶", path: ["dpad", "right"], kind: "plainkey" },
+  { label: "Stik kiri ↑", path: ["leftStick", "up"], kind: "plainkey" },
+  { label: "Stik kiri ↓", path: ["leftStick", "down"], kind: "plainkey" },
+  { label: "Stik kiri ◀", path: ["leftStick", "left"], kind: "plainkey" },
+  { label: "Stik kiri ▶", path: ["leftStick", "right"], kind: "plainkey" },
+  { label: "Setir ◀", path: ["tilt", "left"], kind: "plainkey" },
+  { label: "Setir ▶", path: ["tilt", "right"], kind: "plainkey" },
+];
+
+const KEY_OPTS = [
+  "w", "a", "s", "d", "e", "q", "r", "f", "c", "v",
+  "space", "enter", "escape", "tab", "shift", "control", "alt",
+  "up", "down", "left", "right",
+  "1", "2", "3", "4", "5",
+];
+const MOUSE_OPTS = [
+  { value: "left", label: "🖱 Kiri" },
+  { value: "right", label: "🖱 Kanan" },
+  { value: "middle", label: "🖱 Tengah" },
+];
+
+function getByPath(obj, path) {
+  return path.reduce((o, k) => (o ? o[k] : undefined), obj);
+}
+function patchFromPath(path, value) {
+  const root = {};
+  let cur = root;
+  for (let i = 0; i < path.length - 1; i++) {
+    cur[path[i]] = {};
+    cur = cur[path[i]];
+  }
+  cur[path[path.length - 1]] = value;
+  return root;
+}
+
+function actionLabel(item) {
+  const v = getByPath(keymap, item.path);
+  if (item.kind === "button") {
+    if (!v) return "—";
+    return v.type === "mouse" ? `🖱 ${v.value}` : `⌨ ${v.value}`;
+  }
+  return `⌨ ${v}`;
+}
+
+function renderRemapList() {
+  remapListEl.innerHTML = "";
+  for (const item of REMAP) {
+    const row = document.createElement("div");
+    row.className = "remap-item";
+    row.innerHTML =
+      `<span class="ctrl">${item.label}</span>` +
+      `<span class="act">${actionLabel(item)}</span>`;
+    row.addEventListener("click", () => openPicker(item));
+    remapListEl.appendChild(row);
+  }
+}
+
+let pickerItem = null;
+function openPicker(item) {
+  pickerItem = item;
+  pickerTitle.textContent = `Aksi untuk: ${item.label}`;
+  keyGridEl.innerHTML = "";
+
+  for (const k of KEY_OPTS) {
+    const b = document.createElement("button");
+    b.className = "key-opt";
+    b.textContent = k;
+    b.addEventListener("click", () => chooseAction(k, "key"));
+    keyGridEl.appendChild(b);
+  }
+  // Opsi mouse hanya untuk tombol (bukan stik/d-pad/tilt).
+  if (item.kind === "button") {
+    for (const m of MOUSE_OPTS) {
+      const b = document.createElement("button");
+      b.className = "key-opt mouse";
+      b.textContent = m.label;
+      b.addEventListener("click", () => chooseAction(m.value, "mouse"));
+      keyGridEl.appendChild(b);
+    }
+  }
+  pickerEl.classList.remove("hidden");
+}
+
+async function chooseAction(value, type) {
+  const item = pickerItem;
+  const newVal = item.kind === "button" ? { type, value } : value;
+  const patch = patchFromPath(item.path, newVal);
+  // Optimistic update lokal lalu kirim ke server.
+  keymap = deepMergeLocal(keymap, patch);
+  renderRemapList();
+  pickerEl.classList.add("hidden");
+  haptic();
+  try {
+    await fetch("/keymap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  } catch {}
+}
+
+function deepMergeLocal(target, patch) {
+  const out = structuredClone(target);
+  (function m(t, p) {
+    for (const k of Object.keys(p)) {
+      if (p[k] && typeof p[k] === "object" && !Array.isArray(p[k]) &&
+          t[k] && typeof t[k] === "object") {
+        m(t[k], p[k]);
+      } else t[k] = p[k];
+    }
+  })(out, patch);
+  return out;
+}
+
+async function loadKeymap() {
+  try {
+    const res = await fetch("/keymap");
+    keymap = await res.json();
+    renderRemapList();
+  } catch {}
+}
+
+// --- Wiring tombol pengaturan ---
+function refreshToggleUI() {
+  hapticsToggle.textContent = hapticsEnabled ? "ON" : "OFF";
+  hapticsToggle.classList.toggle("on", hapticsEnabled);
+  tiltToggle.textContent = tiltEnabled ? "ON" : "OFF";
+  tiltToggle.classList.toggle("on", tiltEnabled);
+}
+
+gearBtn.addEventListener("click", () => {
+  if (!keymap) loadKeymap();
+  refreshToggleUI();
+  settingsEl.classList.remove("hidden");
+});
+document.getElementById("closeSettings").addEventListener("click", () =>
+  settingsEl.classList.add("hidden")
+);
+document.getElementById("closePicker").addEventListener("click", () =>
+  pickerEl.classList.add("hidden")
+);
+
+hapticsToggle.addEventListener("click", () => {
+  hapticsEnabled = !hapticsEnabled;
+  localStorage.setItem("haptics", hapticsEnabled ? "on" : "off");
+  refreshToggleUI();
+  haptic();
+});
+
+tiltToggle.addEventListener("click", async () => {
+  if (!tiltEnabled) {
+    const ok = await enableTilt();
+    if (!ok) return;
+  } else {
+    disableTilt();
+  }
+  refreshToggleUI();
+});
+
+document.getElementById("resetMap").addEventListener("click", async () => {
+  try {
+    const res = await fetch("/keymap/reset", { method: "POST" });
+    keymap = await res.json();
+    renderRemapList();
+  } catch {}
+});
+
+// Muat keymap di awal agar label remap siap.
+loadKeymap();
 
 // Coba minta layar tetap menyala (jika didukung).
 async function keepAwake() {

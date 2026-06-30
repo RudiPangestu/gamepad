@@ -13,6 +13,7 @@
 </head>
 <body>
   <div id="status" class="status">Menghubungkan…</div>
+  <button id="gear" class="gear" aria-label="Pengaturan">⚙︎</button>
 
   <div class="pad">
     <!-- Kiri: stik kiri + d-pad -->
@@ -57,6 +58,46 @@
         <div class="stick-base"><div class="stick-knob"></div></div>
         <div class="zone-label">KAMERA</div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== Panel Pengaturan / Remap ===== -->
+  <div id="settings" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2>Pengaturan</h2>
+        <button id="closeSettings" class="x">✕</button>
+      </div>
+
+      <div class="row toggle-row">
+        <span>Getaran (haptic) saat menekan tombol</span>
+        <button id="hapticsToggle" class="toggle">OFF</button>
+      </div>
+
+      <div class="row toggle-row">
+        <span>Setir dengan kemiringan (tilt / gyro)</span>
+        <button id="tiltToggle" class="toggle">OFF</button>
+      </div>
+      <p class="hint" id="tiltHint">
+        Miringkan iPhone kiri/kanan untuk menyetir. Butuh izin gerak (Motion).
+      </p>
+
+      <h3>Ubah Tombol (Remap)</h3>
+      <p class="hint">Ketuk sebuah baris untuk mengganti aksinya di Mac.</p>
+      <div id="remapList" class="remap-list"></div>
+
+      <button id="resetMap" class="reset-btn">Kembalikan ke Default</button>
+    </div>
+  </div>
+
+  <!-- ===== Pemilih tombol untuk remap ===== -->
+  <div id="picker" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="pickerTitle">Pilih aksi</h2>
+        <button id="closePicker" class="x">✕</button>
+      </div>
+      <div id="keyGrid" class="key-grid"></div>
     </div>
   </div>
 

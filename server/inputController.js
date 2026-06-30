@@ -66,8 +66,10 @@ function toMouseButton(name) {
   return null;
 }
 
-// Set tombol yang sedang ditekan, agar bisa press/release dengan benar.
-const heldKeys = new Set();
+// Hitungan referensi tombol yang ditekan. Memakai Map agar beberapa sumber
+// (mis. stik kiri & tilt yang sama-sama memetakan "a") bisa menahan tombol
+// yang sama tanpa saling melepas: tombol fisik baru dilepas saat hitungan 0.
+const heldKeys = new Map();
 const heldMouse = new Set();
 
 export const input = {
@@ -80,8 +82,9 @@ export const input = {
   },
 
   async pressKey(name) {
-    if (heldKeys.has(name)) return;
-    heldKeys.add(name);
+    const count = heldKeys.get(name) || 0;
+    heldKeys.set(name, count + 1);
+    if (count > 0) return; // sudah ditekan oleh sumber lain
     if (mode === "native") {
       const k = toKey(name);
       if (k != null) await nut.keyboard.pressKey(k);
@@ -91,26 +94,18 @@ export const input = {
   },
 
   async releaseKey(name) {
-    if (!heldKeys.has(name)) return;
+    const count = heldKeys.get(name) || 0;
+    if (count === 0) return;
+    if (count > 1) {
+      heldKeys.set(name, count - 1);
+      return; // masih ditahan sumber lain
+    }
     heldKeys.delete(name);
     if (mode === "native") {
       const k = toKey(name);
       if (k != null) await nut.keyboard.releaseKey(k);
     } else {
       console.log(`[mock] releaseKey ${name}`);
-    }
-  },
-
-  // Selaraskan himpunan tombol yang harus ditekan (untuk stik/d-pad).
-  async syncKeys(desired) {
-    const desiredSet = new Set(desired);
-    // lepas yang tidak lagi diinginkan
-    for (const k of [...heldKeys]) {
-      if (!desiredSet.has(k)) await this.releaseKey(k);
-    }
-    // tekan yang baru
-    for (const k of desiredSet) {
-      if (!heldKeys.has(k)) await this.pressKey(k);
     }
   },
 
@@ -148,9 +143,18 @@ export const input = {
     }
   },
 
-  // Lepas semua input (dipanggil saat controller disconnect).
+  // Lepas semua input (dipanggil saat controller disconnect). Paksa lepas
+  // tombol fisik apa pun hitungannya, lalu kosongkan state.
   async releaseAll() {
-    for (const k of [...heldKeys]) await this.releaseKey(k);
+    for (const name of [...heldKeys.keys()]) {
+      if (mode === "native") {
+        const k = toKey(name);
+        if (k != null) await nut.keyboard.releaseKey(k);
+      } else {
+        console.log(`[mock] releaseKey ${name}`);
+      }
+    }
+    heldKeys.clear();
     for (const m of [...heldMouse]) await this.releaseMouse(m);
   },
 

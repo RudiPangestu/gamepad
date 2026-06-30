@@ -88,7 +88,34 @@ Buka game di Mac, klik jendela game agar fokus, lalu gerakkan dengan iPhone. �
 | L2 / R2               | Klik kanan / klik kiri |
 | Start / Select        | Esc / Tab              |
 
-Ubah semuanya di **`server/keymap.js`**.
+Ubah semuanya di **`server/keymap.js`**, atau langsung dari iPhone (lihat di bawah).
+
+---
+
+## ✨ Fitur tambahan
+
+Ketuk ikon **⚙︎** di pojok kanan atas layar iPhone untuk membuka pengaturan.
+
+### 1. Getaran / Haptic
+Saat menekan tombol, iPhone bergetar halus sebagai umpan balik.
+- **Android / browser pendukung**: pakai `navigator.vibrate`.
+- **iPhone (Safari)**: iOS tidak mendukung `navigator.vibrate`, jadi dipakai
+  trik haptic ringan (iOS 17.4+). Efeknya halus dan _best-effort_ — tidak
+  semua iPhone/versi memberi getaran. Bisa dimatikan dari panel pengaturan.
+
+### 2. Remap tombol dari layar iPhone
+Di panel pengaturan ada daftar **Ubah Tombol**. Ketuk satu kontrol (mis. A,
+D-pad ↑, Setir ◀) lalu pilih aksi baru (tombol keyboard atau klik mouse).
+Perubahan langsung dikirim ke Mac dan **tersimpan** di `server/keymap.user.json`
+sehingga tetap ada setelah server di-restart. Tombol **Kembalikan ke Default**
+menghapus semua perubahan.
+
+### 3. Setir dengan kemiringan (Tilt / Gyroscope)
+Aktifkan **"Setir dengan kemiringan"** di pengaturan, lalu miringkan iPhone
+kiri/kanan untuk menyetir (default dipetakan ke tombol `A`/`D`, bisa di-remap).
+Cocok untuk game balap/mengemudi.
+- iOS akan meminta **izin gerak (Motion)** sekali — ketuk *Allow*.
+- Sumbu & ambang bisa diatur di `keymap.tilt` (`server/keymap.js`).
 
 ---
 
@@ -122,11 +149,13 @@ gamepad/
 ├── server/
 │   ├── index.js           # server: HTTP + WebSocket + routing input
 │   ├── inputController.js  # simulasi keyboard & mouse (nut-js / mock)
-│   └── keymap.js          # konfigurasi pemetaan tombol  ← edit di sini
+│   ├── config.js          # keymap "hidup": default + override remap
+│   ├── keymap.js          # konfigurasi pemetaan tombol  ← edit di sini
+│   └── keymap.user.json    # (otomatis) hasil remap dari iPhone
 └── public/
-    ├── index.html         # UI controller untuk iPhone
+    ├── index.html         # UI controller + panel pengaturan/remap
     ├── style.css
-    └── controller.js      # logika sentuh + WebSocket client
+    └── controller.js      # sentuh + WebSocket + haptic + tilt + remap
 ```
 
 ## Lisensi

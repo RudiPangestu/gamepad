@@ -64,4 +64,19 @@ export const keymap = {
     l3: { type: "key", value: "shift" },   // sprint
     r3: { type: "key", value: "c" },
   },
+
+  // Tilt / gyroscope: miringkan iPhone kiri-kanan untuk menyetir.
+  // Diaktifkan dari layar iPhone (butuh izin Motion). Server memetakan
+  // sumbu kemiringan -> tombol berikut.
+  tilt: {
+    enabled: true,
+    threshold: 0.25,   // seberapa miring sebelum tombol aktif (0..1)
+    left: "a",
+    right: "d",
+  },
+
+  // Haptic / getaran di iPhone saat menekan tombol. Murni di sisi iPhone.
+  haptics: {
+    enabled: true,
+  },
 };
