@@ -180,6 +180,7 @@ function setupStick(zoneId, side) {
   }
 
   zone.addEventListener("touchstart", (e) => {
+    if (isEditing()) return; // mode atur tata letak: jangan aktifkan stik
     e.preventDefault();
     if (activeTouchId !== null) return;
     const t = e.changedTouches[0];
@@ -211,8 +212,13 @@ setupStick("leftStick", "left");
 setupStick("rightStick", "right");
 
 // --- Tombol (multi-touch, press & release) --------------------------------
+function isEditing() {
+  return document.body.classList.contains("editing");
+}
+
 function bindButton(el, onDown, onUp) {
   el.addEventListener("touchstart", (e) => {
+    if (isEditing()) return; // saat atur tata letak, tombol tidak menembak
     e.preventDefault();
     el.classList.add("active");
     haptic();
@@ -771,6 +777,152 @@ function bindTpClick(id, button) {
 }
 bindTpClick("tpLeft", "left");
 bindTpClick("tpRight", "right");
+
+// ===========================================================================
+//  KUNCI LAYAR (anti-sentuh nyasar buka menu)
+// ===========================================================================
+const lockBtn = document.getElementById("lock");
+const lockHint = document.getElementById("lockHint");
+let locked = false;
+let lockPressStart = 0;
+let unlockTimer = null;
+
+function doLock() {
+  locked = true;
+  document.body.classList.add("locked");
+  lockBtn.textContent = "🔒";
+  lockHint.classList.remove("hidden");
+  haptic();
+}
+function doUnlock() {
+  locked = false;
+  document.body.classList.remove("locked");
+  lockBtn.textContent = "🔓";
+  lockHint.classList.add("hidden");
+  haptic();
+}
+
+lockBtn.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  lockPressStart = Date.now();
+  if (locked) unlockTimer = setTimeout(doUnlock, 700); // tahan 0.7s untuk buka
+}, { passive: false });
+lockBtn.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = null; }
+  if (!locked && Date.now() - lockPressStart < 400) doLock();
+});
+lockBtn.addEventListener("touchcancel", () => {
+  if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = null; }
+});
+
+// ===========================================================================
+//  ATUR TATA LETAK (geser posisi grup tombol)
+// ===========================================================================
+const DRAG_IDS = ["leftStick", "dpad", "rightStick", "face", "triggers", "bumpers", "meta"];
+const padEl = document.querySelector(".pad");
+const layoutBar = document.getElementById("layoutBar");
+let layout = loadLayout();
+
+function loadLayout() {
+  try { return JSON.parse(localStorage.getItem("layout") || "null"); } catch { return null; }
+}
+
+function applyLayoutObject(obj) {
+  if (!obj) {
+    document.body.classList.remove("custom-layout");
+    for (const id of DRAG_IDS) {
+      const el = document.getElementById(id);
+      if (el) { el.style.left = ""; el.style.top = ""; }
+    }
+    return;
+  }
+  document.body.classList.add("custom-layout");
+  for (const id of DRAG_IDS) {
+    const el = document.getElementById(id);
+    const p = obj[id];
+    if (el && p) { el.style.left = p.x + "%"; el.style.top = p.y + "%"; }
+  }
+}
+
+// Posisi grup saat ini (dalam % dari area pad) — dipakai sebagai titik awal.
+function captureCurrentPositions() {
+  const rect = padEl.getBoundingClientRect();
+  const out = {};
+  for (const id of DRAG_IDS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    out[id] = {
+      x: ((r.left + r.width / 2) - rect.left) / rect.width * 100,
+      y: ((r.top + r.height / 2) - rect.top) / rect.height * 100,
+    };
+  }
+  return out;
+}
+
+if (layout) applyLayoutObject(layout);
+
+function enterEditLayout() {
+  settingsEl.classList.add("hidden");
+  if (!layout) layout = captureCurrentPositions(); // tangkap posisi default (masih flow)
+  applyLayoutObject(layout);
+  document.body.classList.add("editing");
+  layoutBar.classList.remove("hidden");
+}
+function exitEditLayout(save) {
+  document.body.classList.remove("editing");
+  layoutBar.classList.add("hidden");
+  if (save) localStorage.setItem("layout", JSON.stringify(layout));
+}
+
+document.getElementById("editLayout").addEventListener("click", enterEditLayout);
+document.getElementById("doneLayout").addEventListener("click", () => exitEditLayout(true));
+document.getElementById("resetLayout").addEventListener("click", () => {
+  layout = null;
+  localStorage.removeItem("layout");
+  applyLayoutObject(null);
+  exitEditLayout(false);
+});
+
+// Pasang drag ke tiap grup (hanya berfungsi saat mode editing).
+for (const id of DRAG_IDS) {
+  const el = document.getElementById(id);
+  if (!el) continue;
+  let grabDX = 0, grabDY = 0, dragId = null;
+
+  el.addEventListener("touchstart", (e) => {
+    if (!isEditing()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const t = e.changedTouches[0];
+    dragId = t.identifier;
+    const r = el.getBoundingClientRect();
+    grabDX = t.clientX - (r.left + r.width / 2);
+    grabDY = t.clientY - (r.top + r.height / 2);
+  }, { passive: false });
+
+  el.addEventListener("touchmove", (e) => {
+    if (!isEditing() || dragId === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== dragId) continue;
+      const rect = padEl.getBoundingClientRect();
+      let x = ((t.clientX - grabDX) - rect.left) / rect.width * 100;
+      let y = ((t.clientY - grabDY) - rect.top) / rect.height * 100;
+      x = Math.max(4, Math.min(96, x));
+      y = Math.max(8, Math.min(92, y));
+      el.style.left = x + "%";
+      el.style.top = y + "%";
+      layout[id] = { x, y };
+    }
+  }, { passive: false });
+
+  const dragEnd = () => { dragId = null; };
+  el.addEventListener("touchend", dragEnd);
+  el.addEventListener("touchcancel", dragEnd);
+}
 
 // Coba minta layar tetap menyala (jika didukung).
 async function keepAwake() {

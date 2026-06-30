@@ -14,6 +14,8 @@
 <body>
   <div id="status" class="status">Menghubungkan…</div>
   <button id="gear" class="gear" aria-label="Pengaturan">⚙︎</button>
+  <button id="lock" class="gear lock-btn" aria-label="Kunci layar">🔓</button>
+  <div id="lockHint" class="lock-hint hidden">🔒 tahan ikon gembok untuk buka</div>
 
   <!-- ===== Pilih Pemain ===== -->
   <div id="playerSelect" class="overlay">
@@ -37,11 +39,11 @@
   <div class="pad">
     <!-- Kiri: stik kiri + d-pad -->
     <div class="side left">
-      <div class="stick-zone" id="leftStick">
+      <div class="stick-zone drag-group" id="leftStick">
         <div class="stick-base"><div class="stick-knob"></div></div>
         <div class="zone-label">GERAK</div>
       </div>
-      <div class="dpad">
+      <div class="dpad drag-group" id="dpad">
         <button class="dbtn up"    data-dpad="up">▲</button>
         <button class="dbtn left"  data-dpad="left">◀</button>
         <button class="dbtn right" data-dpad="right">▶</button>
@@ -51,15 +53,15 @@
 
     <!-- Tengah: bumper/trigger + start/select -->
     <div class="center">
-      <div class="triggers">
+      <div class="triggers drag-group" id="triggers">
         <button class="trig" data-btn="l2">L2</button>
         <button class="trig" data-btn="r2">R2</button>
       </div>
-      <div class="bumpers">
+      <div class="bumpers drag-group" id="bumpers">
         <button class="bump" data-btn="l1">L1</button>
         <button class="bump" data-btn="r1">R1</button>
       </div>
-      <div class="meta">
+      <div class="meta drag-group" id="meta">
         <button class="metabtn" data-btn="select">SELECT</button>
         <button class="metabtn" data-btn="start">START</button>
       </div>
@@ -67,17 +69,24 @@
 
     <!-- Kanan: tombol muka + stik kanan -->
     <div class="side right">
-      <div class="face">
+      <div class="face drag-group" id="face">
         <button class="fbtn y" data-btn="y">Y</button>
         <button class="fbtn x" data-btn="x">X</button>
         <button class="fbtn b" data-btn="b">B</button>
         <button class="fbtn a" data-btn="a">A</button>
       </div>
-      <div class="stick-zone" id="rightStick">
+      <div class="stick-zone drag-group" id="rightStick">
         <div class="stick-base"><div class="stick-knob"></div></div>
         <div class="zone-label">KAMERA</div>
       </div>
     </div>
+  </div>
+
+  <!-- Bar saat mengatur tata letak -->
+  <div id="layoutBar" class="layout-bar hidden">
+    <span class="lb-text">Seret tombol untuk atur posisi</span>
+    <button id="resetLayout" class="lb-reset">Reset</button>
+    <button id="doneLayout" class="lb-done">Selesai ✓</button>
   </div>
 
   <!-- ===== Panel Pengaturan / Remap ===== -->
@@ -109,6 +118,11 @@
       <div class="row toggle-row">
         <span>Mode Trackpad (jadikan layar touchpad mouse)</span>
         <button id="openTrackpad" class="toggle">Buka</button>
+      </div>
+
+      <div class="row toggle-row">
+        <span>Atur tata letak tombol (geser posisi)</span>
+        <button id="editLayout" class="toggle">Atur</button>
       </div>
 
       <h3>Profil Game</h3>

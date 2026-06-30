@@ -182,6 +182,19 @@ Pengaturan → **Mode Trackpad** mengubah layar iPhone jadi touchpad presisi:
 - Berguna untuk navigasi menu/inventory atau game point-and-click. (Ingat:
   Mac hanya punya 1 kursor, jadi trackpad menggerakkan kursor yang sama.)
 
+### 7. Kunci layar 🔒
+Ketuk ikon **🔓** (di kiri ikon ⚙︎) untuk mengunci. Saat terkunci, tombol
+pengaturan dinonaktifkan supaya tidak terbuka tak sengaja saat main —
+kontrol game tetap jalan normal. Untuk membuka, **tahan ikon gembok ±0,7
+detik** (sengaja dibuat agak lama agar tidak kebuka tak sengaja).
+
+### 8. Atur tata letak tombol 🧩
+Pengaturan → **Atur tata letak tombol**. Masuk mode atur, lalu **seret** tiap
+grup (stik, d-pad, ABXY, L1/R1, L2/R2, Start/Select) ke posisi yang nyaman.
+- **Selesai ✓** menyimpan tata letak (tersimpan di iPhone, per-perangkat).
+- **Reset** mengembalikan ke tata letak bawaan.
+- Saat mode atur, tombol tidak menembak input — jadi aman memindahkannya.
+
 ---
 
 ## 🔧 Konfigurasi

@@ -66,6 +66,67 @@ body {
   z-index: 50;
 }
 .gear:active { background: var(--accent); color: #06241a; }
+.lock-btn { right: 50px; }   /* di kiri tombol gear */
+
+/* Saat terkunci: gear & tombol atur tidak bisa ditekan tak sengaja */
+body.locked .gear:not(.lock-btn) { opacity: 0.25; pointer-events: none; }
+.lock-hint {
+  position: fixed;
+  top: 44px;
+  right: 10px;
+  z-index: 50;
+  font-size: 11px;
+  color: #ffb24a;
+  background: #20242f;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+.lock-hint.hidden { display: none; }
+
+/* ===== Atur tata letak ===== */
+.pad { position: relative; }
+
+body.custom-layout .side,
+body.custom-layout .center {
+  position: static;
+}
+body.custom-layout .drag-group {
+  position: absolute;
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
+body.editing .drag-group {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+body.editing { } /* kontrol dinonaktifkan via JS saat editing */
+
+.layout-bar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #161922;
+  border: 1px solid #2c3140;
+  border-radius: 999px;
+  padding: 6px 8px 6px 16px;
+}
+.layout-bar.hidden { display: none; }
+.layout-bar .lb-text { font-size: 12px; color: #cdd3e0; }
+.layout-bar button {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lb-reset { background: #2a1b1b; color: #e5847c; }
+.lb-done { background: var(--accent); color: #06241a; }
 
 /* ===== Overlay panel ===== */
 .overlay {
