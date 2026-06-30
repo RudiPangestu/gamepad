@@ -30,7 +30,21 @@ sendiri di `server/keymap.js`.
 
 ## 🚀 Cara pakai
 
-### 1. Di MacBook — install & jalankan server
+### Cara cepat (1-klik, tanpa ketik Terminal)
+
+1. Di Finder, buka folder `gamepad`.
+2. **Klik kanan `start.command` → Open** (cukup sekali, untuk melewati
+   peringatan keamanan macOS). Berikutnya tinggal **double-klik**.
+3. Jendela akan otomatis install dependency (kali pertama) lalu menjalankan
+   server dan menampilkan alamat untuk dibuka di iPhone.
+4. Lanjut ke langkah **"Beri izin Accessibility"** dan **"Di iPhone"** di bawah.
+
+> Mau cek koneksi dulu tanpa menggerakkan game? Pakai **`start-test.command`**
+> (mode tes — input hanya dicetak di jendela).
+
+### Cara manual (lewat Terminal)
+
+#### 1. Di MacBook — install & jalankan server
 
 ```bash
 git clone <repo-ini>
