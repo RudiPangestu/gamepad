@@ -108,28 +108,55 @@ app.get("/qr.svg", async (req, res) => {
 });
 
 // Halaman QR yang rapi & tajam untuk dipindai (dibuka di browser Mac).
-// QR mengikuti host pada URL halaman ini, jadi buka lewat IP LAN (bukan
-// localhost) agar QR berisi alamat yang bisa dijangkau iPhone.
-app.get("/connect", (req, res) => {
-  const url = `http://${req.headers.host}`;
+// Menampilkan SATU QR per alamat jaringan Mac, sehingga HP di jalur jaringan
+// berbeda (WiFi, hotspot, USB, dll) tinggal memindai QR yang cocok.
+app.get("/connect", async (req, res) => {
+  // Urutkan: alamat "biasa" dulu, link-local (169.254.x) paling belakang.
+  const ips = getLanIps().sort((a, b) => {
+    const la = a.startsWith("169.254.") ? 1 : 0;
+    const lb = b.startsWith("169.254.") ? 1 : 0;
+    return la - lb;
+  });
+
+  let cards = "";
+  if (ips.length === 0) {
+    cards = `<p>Tidak menemukan alamat jaringan. Pastikan Mac terhubung ke WiFi/jaringan.</p>`;
+  } else {
+    for (let i = 0; i < ips.length; i++) {
+      const url = `http://${ips[i]}:${PORT}`;
+      let svg = "";
+      try { svg = await QRCode.toString(url, { type: "svg", margin: 1, width: 220 }); } catch {}
+      const note = ips[i].startsWith("169.254.") ? " (kabel/langsung)" : "";
+      cards += `<div class="card"><div class="qr">${svg}</div>` +
+        `<div class="lbl">Jaringan ${i + 1}${note}</div>` +
+        `<a href="${url}">${url}</a></div>`;
+    }
+  }
+
   res.type("html").send(`<!DOCTYPE html><html lang="id"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sambungkan iPhone</title>
+<title>Sambungkan HP</title>
 <style>
-  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;background:#0e1015;color:#e8ecf4;font-family:-apple-system,system-ui,sans-serif}
-  h1{font-size:20px;margin:0 0 6px}
-  p{color:#9aa3b5;margin:4px 0 18px;font-size:14px}
-  .card{background:#fff;padding:20px;border-radius:18px}
-  .card img{display:block;width:300px;height:300px}
-  a{color:#3ddc97;font-family:ui-monospace,monospace;font-size:16px;margin-top:18px;text-decoration:none}
-  .hint{color:#707a90;font-size:12px;margin-top:8px;max-width:340px;text-align:center}
+  body{margin:0;min-height:100vh;background:#0e1015;color:#e8ecf4;
+    font-family:-apple-system,system-ui,sans-serif;text-align:center;padding:24px 12px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#9aa3b5;margin:4px auto 22px;font-size:14px;max-width:520px}
+  .grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center}
+  .card{background:#161922;border:1px solid #2c3140;border-radius:16px;padding:16px;width:250px}
+  .qr{background:#fff;border-radius:12px;padding:12px}
+  .qr svg{display:block;width:100%;height:auto}
+  .lbl{margin-top:12px;font-weight:700;font-size:14px}
+  .card a{display:block;margin-top:4px;color:#3ddc97;font-family:ui-monospace,monospace;
+    font-size:13px;text-decoration:none;word-break:break-all}
+  .tip{color:#707a90;font-size:12px;margin-top:22px;max-width:520px;margin-left:auto;margin-right:auto}
 </style></head><body>
-  <h1>🎮 Sambungkan iPhone</h1>
-  <p>Buka <b>Kamera</b> iPhone (jaringan WiFi yang sama), arahkan ke QR.</p>
-  <div class="card"><img src="/qr.svg" alt="QR"></div>
-  <a href="${url}">${url}</a>
-  <div class="hint">Ketuk notifikasi yang muncul di iPhone untuk membuka halaman controller.</div>
+  <h1>🎮 Sambungkan HP ke Mac</h1>
+  <div class="sub">Buka <b>Kamera</b> di HP (iPhone/Android), arahkan ke salah satu QR,
+    lalu ketuk notifikasi untuk membuka controller.</div>
+  <div class="grid">${cards}</div>
+  <div class="tip">Ada beberapa QR karena Mac punya beberapa alamat jaringan.
+    <b>Scan QR yang jaringannya sama dengan HP-mu.</b> Tidak yakin? Mulai dari
+    "Jaringan 1"; kalau halaman tak terbuka, coba QR berikutnya.</div>
 </body></html>`);
 });
 
