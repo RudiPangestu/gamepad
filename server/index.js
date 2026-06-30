@@ -16,6 +16,7 @@ import http from "http";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import { exec } from "child_process";
 import QRCode from "qrcode";
 
 import { input } from "./inputController.js";
@@ -95,15 +96,41 @@ app.post("/profiles/import", (req, res) => {
   res.json(r);
 });
 
-// QR code dari URL koneksi (memakai host yang dipakai iPhone saat ini).
+// QR code dari URL koneksi (memakai host yang dipakai pemanggil saat ini).
 app.get("/qr.svg", async (req, res) => {
   const url = `http://${req.headers.host}`;
   try {
-    const svg = await QRCode.toString(url, { type: "svg", margin: 1, width: 260 });
+    const svg = await QRCode.toString(url, { type: "svg", margin: 1, width: 320 });
     res.type("image/svg+xml").send(svg);
   } catch {
     res.status(500).send("qr error");
   }
+});
+
+// Halaman QR yang rapi & tajam untuk dipindai (dibuka di browser Mac).
+// QR mengikuti host pada URL halaman ini, jadi buka lewat IP LAN (bukan
+// localhost) agar QR berisi alamat yang bisa dijangkau iPhone.
+app.get("/connect", (req, res) => {
+  const url = `http://${req.headers.host}`;
+  res.type("html").send(`<!DOCTYPE html><html lang="id"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sambungkan iPhone</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:#0e1015;color:#e8ecf4;font-family:-apple-system,system-ui,sans-serif}
+  h1{font-size:20px;margin:0 0 6px}
+  p{color:#9aa3b5;margin:4px 0 18px;font-size:14px}
+  .card{background:#fff;padding:20px;border-radius:18px}
+  .card img{display:block;width:300px;height:300px}
+  a{color:#3ddc97;font-family:ui-monospace,monospace;font-size:16px;margin-top:18px;text-decoration:none}
+  .hint{color:#707a90;font-size:12px;margin-top:8px;max-width:340px;text-align:center}
+</style></head><body>
+  <h1>🎮 Sambungkan iPhone</h1>
+  <p>Buka <b>Kamera</b> iPhone (jaringan WiFi yang sama), arahkan ke QR.</p>
+  <div class="card"><img src="/qr.svg" alt="QR"></div>
+  <a href="${url}">${url}</a>
+  <div class="hint">Ketuk notifikasi yang muncul di iPhone untuk membuka halaman controller.</div>
+</body></html>`);
 });
 
 const server = http.createServer(app);
@@ -402,14 +429,25 @@ server.listen(PORT, "0.0.0.0", async () => {
   }
   console.log("==========================================================");
 
-  // Tampilkan QR code agar iPhone tinggal scan (pakai Kamera) untuk membuka.
+  // QR koneksi: buka halaman QR yang TAJAM di browser Mac (paling mudah
+  // dipindai). QR di terminal sering gepeng/tidak terbaca kamera, jadi hanya
+  // dipakai sebagai cadangan di non-macOS.
   if (ips.length > 0) {
-    const url = `http://${ips[0]}:${PORT}`;
-    try {
-      const qr = await QRCode.toString(url, { type: "terminal", small: true });
-      console.log(`  Scan QR ini dengan Kamera iPhone untuk membuka ${url} :\n`);
-      console.log(qr);
-    } catch {}
+    const connectUrl = `http://${ips[0]}:${PORT}/connect`;
+    let opened = false;
+    if (process.platform === "darwin") {
+      try { exec(`open "${connectUrl}"`); opened = true; } catch {}
+    }
+    if (opened) {
+      console.log(`  📷 Halaman QR dibuka di browser Mac untuk dipindai iPhone.`);
+      console.log(`     (Jika tidak terbuka, kunjungi: ${connectUrl} )`);
+    } else {
+      console.log(`  📷 Buka di browser Mac lalu pindai QR-nya: ${connectUrl}`);
+      try {
+        const qr = await QRCode.toString(`http://${ips[0]}:${PORT}`, { type: "terminal" });
+        console.log(qr);
+      } catch {}
+    }
   }
   console.log("");
 });

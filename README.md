@@ -203,8 +203,11 @@ muncul & aktif. Cocok untuk berbagi setting yang sudah pas untuk suatu game.
 
 ### 10. QR code untuk koneksi 📷
 Biar tak perlu mengetik IP:
-- Saat `npm start`, **QR muncul di terminal** — scan dengan **Kamera iPhone**
-  untuk langsung membuka halaman controller.
+- Saat `npm start` di **macOS**, otomatis terbuka **halaman QR yang tajam di
+  browser Mac** (`/connect`). Buka **Kamera iPhone**, arahkan ke QR, lalu ketuk
+  notifikasi untuk membuka controller. (QR ASCII di terminal sering gepeng &
+  susah dipindai, jadi dipakai cara browser ini.)
+- Kalau tak terbuka otomatis, kunjungi sendiri `http://<IP-MAC>:8080/connect`.
 - Di iPhone yang sudah terhubung, layar pilih pemain / pengaturan punya tombol
   **QR** untuk menampilkan QR ke **HP lain** (jaringan sama) agar gampang ikut
   menyambung.
