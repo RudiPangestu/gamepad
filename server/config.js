@@ -155,3 +155,38 @@ export function deleteProfile(name) {
   save();
   return listProfiles();
 }
+
+// ---------- Berbagi profil (export / import) ----------
+// Kode berbagi = base64 dari JSON { v, name, keymaps:{1,2} }.
+export function exportProfile(name) {
+  const n = cleanName(name);
+  if (!n || !store.profiles[n]) return { error: "profil tidak ada" };
+  const payload = { v: 1, name: n, keymaps: store.profiles[n] };
+  const code = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+  return { name: n, code };
+}
+
+export function importProfile(code) {
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(String(code || "").trim(), "base64").toString("utf8"));
+  } catch {
+    return { error: "kode tidak valid" };
+  }
+  if (!payload || typeof payload !== "object" || !payload.keymaps) {
+    return { error: "kode tidak valid" };
+  }
+  // Buat nama unik agar tidak menimpa profil yang ada.
+  const base = cleanName(payload.name) || "Impor";
+  let name = base;
+  let i = 2;
+  while (store.profiles[name]) name = `${base} ${i++}`;
+  // Gabungkan ke default agar key yang hilang tetap terisi & aman.
+  store.profiles[name] = {
+    1: deepMerge(freshProfile()[1], payload.keymaps[1] || {}),
+    2: deepMerge(freshProfile()[2], payload.keymaps[2] || {}),
+  };
+  store.active = name;
+  save();
+  return { ...listProfiles(), imported: name };
+}

@@ -33,6 +33,7 @@
           <span class="pstate" data-state="2">kosong</span>
         </button>
       </div>
+      <button id="showQr" class="qr-link">📷 Sambungkan HP lain (QR)</button>
     </div>
   </div>
 
@@ -126,12 +127,22 @@
       </div>
 
       <h3>Profil Game</h3>
-      <p class="hint">Simpan beberapa preset mapping & ganti cepat per game.</p>
+      <p class="hint">Simpan preset mapping, ganti cepat, atau <b>bagikan</b> ke
+        pemain lain lewat kode.</p>
       <div id="profileList" class="profile-list"></div>
       <div class="profile-new">
         <input id="newProfileName" type="text" placeholder="Nama profil baru…"
           maxlength="24" autocomplete="off" />
         <button id="createProfile" class="mini-btn">+ Buat</button>
+      </div>
+      <div class="profile-new">
+        <input id="importCode" type="text" placeholder="Tempel kode profil…"
+          autocomplete="off" />
+        <button id="importProfileBtn" class="mini-btn">Impor</button>
+      </div>
+      <div class="row toggle-row">
+        <span>Sambungkan HP lain via QR</span>
+        <button id="showQr2" class="toggle">QR</button>
       </div>
 
       <h3>Ubah Tombol (Remap)</h3>
@@ -150,6 +161,34 @@
         <button id="closePicker" class="x">✕</button>
       </div>
       <div id="keyGrid" class="key-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== QR koneksi ===== -->
+  <div id="qrModal" class="overlay hidden">
+    <div class="sheet qr-sheet">
+      <div class="sheet-head">
+        <h2>Sambungkan HP lain</h2>
+        <button id="closeQr" class="x">✕</button>
+      </div>
+      <p class="hint">Buka <b>Kamera</b> di HP lain (jaringan sama), arahkan ke
+        QR ini, lalu ketuk notifikasi untuk membuka.</p>
+      <div class="qr-box"><img id="qrImg" alt="QR koneksi" /></div>
+      <p id="qrUrl" class="qr-url"></p>
+    </div>
+  </div>
+
+  <!-- ===== Bagikan profil ===== -->
+  <div id="shareModal" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="shareTitle">Bagikan profil</h2>
+        <button id="closeShare" class="x">✕</button>
+      </div>
+      <p class="hint">Salin kode ini dan kirim ke pemain lain. Mereka tempel di
+        kolom <b>Impor</b> pada aplikasi mereka.</p>
+      <textarea id="shareCode" class="share-code" readonly></textarea>
+      <button id="copyShare" class="mini-btn">📋 Salin kode</button>
     </div>
   </div>
 

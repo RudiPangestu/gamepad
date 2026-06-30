@@ -195,6 +195,20 @@ grup (stik, d-pad, ABXY, L1/R1, L2/R2, Start/Select) ke posisi yang nyaman.
 - **Reset** mengembalikan ke tata letak bawaan.
 - Saat mode atur, tombol tidak menembak input — jadi aman memindahkannya.
 
+### 9. Bagikan set tombol (profil) 🔗
+Di tiap profil ada tombol **Bagikan** → muncul **kode** yang bisa kamu salin
+dan kirim ke pemain lain (lewat chat/WA dll). Pemain lain menempel kode itu
+di kolom **Impor** pada aplikasi mereka, lalu profil (mapping P1 & P2) langsung
+muncul & aktif. Cocok untuk berbagi setting yang sudah pas untuk suatu game.
+
+### 10. QR code untuk koneksi 📷
+Biar tak perlu mengetik IP:
+- Saat `npm start`, **QR muncul di terminal** — scan dengan **Kamera iPhone**
+  untuk langsung membuka halaman controller.
+- Di iPhone yang sudah terhubung, layar pilih pemain / pengaturan punya tombol
+  **QR** untuk menampilkan QR ke **HP lain** (jaringan sama) agar gampang ikut
+  menyambung.
+
 ---
 
 ## 🔧 Konfigurasi

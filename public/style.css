@@ -313,6 +313,59 @@ body.editing { } /* kontrol dinonaktifkan via JS saat editing */
   background: #11281c; color: var(--accent); font-weight: 700; font-size: 13px;
 }
 
+/* ===== QR koneksi ===== */
+.qr-link {
+  margin-top: 16px;
+  width: 100%;
+  padding: 11px;
+  border-radius: 10px;
+  border: 1px solid #2c3140;
+  background: #20242f;
+  color: #cdd3e0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.qr-sheet { text-align: center; max-width: 360px; }
+.qr-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  margin: 10px auto 8px;
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qr-box img { width: 100%; height: 100%; }
+.qr-url {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+/* ===== Bagikan profil ===== */
+.share-code {
+  width: 100%;
+  height: 96px;
+  resize: none;
+  border-radius: 10px;
+  border: 1px solid #2c3140;
+  background: #11141b;
+  color: #aeb6c8;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  padding: 10px;
+  margin-bottom: 10px;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.profile-item .share {
+  background: #11283f; border: 1px solid #2a4a6a; color: #6ab0ff;
+  border-radius: 6px; font-size: 11px; padding: 4px 9px;
+}
+
 /* ===== Trackpad ===== */
 #trackpad {
   flex-direction: column;

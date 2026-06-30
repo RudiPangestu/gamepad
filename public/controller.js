@@ -627,6 +627,11 @@ function renderProfiles() {
       use.addEventListener("click", () => switchProfile(name));
       actions.appendChild(use);
     }
+    const share = document.createElement("button");
+    share.className = "share";
+    share.textContent = "Bagikan";
+    share.addEventListener("click", () => openShare(name));
+    actions.appendChild(share);
     if (name !== "Default") {
       const del = document.createElement("button");
       del.className = "del";
@@ -698,6 +703,70 @@ async function deleteProfileFn(name) {
 }
 
 document.getElementById("createProfile").addEventListener("click", createProfileFn);
+
+// --- Bagikan profil (export kode) ---
+async function openShare(name) {
+  try {
+    const res = await fetch(`/profiles/export?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    document.getElementById("shareTitle").textContent = `Bagikan: ${name}`;
+    document.getElementById("shareCode").value = data.code;
+    document.getElementById("shareModal").classList.remove("hidden");
+  } catch {}
+}
+document.getElementById("closeShare").addEventListener("click", () =>
+  document.getElementById("shareModal").classList.add("hidden")
+);
+document.getElementById("copyShare").addEventListener("click", async () => {
+  const ta = document.getElementById("shareCode");
+  try {
+    await navigator.clipboard.writeText(ta.value);
+  } catch {
+    ta.focus(); ta.select(); document.execCommand("copy"); // fallback
+  }
+  haptic();
+  const btn = document.getElementById("copyShare");
+  const old = btn.textContent;
+  btn.textContent = "✓ Tersalin";
+  setTimeout(() => (btn.textContent = old), 1200);
+});
+
+// --- Impor profil dari kode ---
+document.getElementById("importProfileBtn").addEventListener("click", async () => {
+  const inp = document.getElementById("importCode");
+  const code = (inp.value || "").trim();
+  if (!code) return;
+  try {
+    const res = await fetch("/profiles/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const data = await res.json();
+    if (data.error) { alert("Kode tidak valid."); return; }
+    profiles = data;
+    inp.value = "";
+    renderProfiles();
+    loadKeymap();
+    alert(`Profil "${data.imported}" berhasil diimpor & diaktifkan.`);
+  } catch {
+    alert("Gagal mengimpor.");
+  }
+});
+
+// --- QR koneksi ---
+function openQr() {
+  document.getElementById("qrImg").src = "/qr.svg?ts=" + Date.now();
+  document.getElementById("qrUrl").textContent = location.origin;
+  settingsEl.classList.add("hidden");
+  document.getElementById("qrModal").classList.remove("hidden");
+}
+document.getElementById("showQr").addEventListener("click", openQr);
+document.getElementById("showQr2").addEventListener("click", openQr);
+document.getElementById("closeQr").addEventListener("click", () =>
+  document.getElementById("qrModal").classList.add("hidden")
+);
 
 // ===========================================================================
 //  MODE TRACKPAD

@@ -16,11 +16,13 @@ import http from "http";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import QRCode from "qrcode";
 
 import { input } from "./inputController.js";
 import {
   getKeymap, applyPatch, resetKeymap,
   listProfiles, setActiveProfile, createProfile, deleteProfile,
+  exportProfile, importProfile,
 } from "./config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,6 +78,32 @@ app.post("/profiles/delete", (req, res) => {
   if (r.error) return res.status(400).json(r);
   broadcastProfile();
   res.json(r);
+});
+
+// Export profil -> kode berbagi.
+app.get("/profiles/export", (req, res) => {
+  const r = exportProfile(req.query.name);
+  if (r.error) return res.status(400).json(r);
+  res.json(r);
+});
+
+// Import profil dari kode berbagi.
+app.post("/profiles/import", (req, res) => {
+  const r = importProfile((req.body || {}).code);
+  if (r.error) return res.status(400).json(r);
+  broadcastProfile();
+  res.json(r);
+});
+
+// QR code dari URL koneksi (memakai host yang dipakai iPhone saat ini).
+app.get("/qr.svg", async (req, res) => {
+  const url = `http://${req.headers.host}`;
+  try {
+    const svg = await QRCode.toString(url, { type: "svg", margin: 1, width: 260 });
+    res.type("image/svg+xml").send(svg);
+  } catch {
+    res.status(500).send("qr error");
+  }
 });
 
 const server = http.createServer(app);
@@ -360,17 +388,28 @@ function getLanIps() {
 
 await input.init();
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", async () => {
   const ips = getLanIps();
   console.log("\n==========================================================");
   console.log("  🎮  iPhone -> Mac Gamepad server berjalan (2 pemain)");
   console.log("  Mode input :", input.mode === "native" ? "NATIVE (keyboard+mouse aktif)" : "MOCK (hanya log)");
   console.log("----------------------------------------------------------");
-  console.log("  Buka di Safari iPhone (WiFi yang sama dgn Mac):");
+  console.log("  Buka di Safari iPhone (jaringan yang sama dgn Mac):");
   if (ips.length === 0) {
     console.log(`     http://<IP-MAC-KAMU>:${PORT}`);
   } else {
     for (const ip of ips) console.log(`     http://${ip}:${PORT}`);
   }
-  console.log("==========================================================\n");
+  console.log("==========================================================");
+
+  // Tampilkan QR code agar iPhone tinggal scan (pakai Kamera) untuk membuka.
+  if (ips.length > 0) {
+    const url = `http://${ips[0]}:${PORT}`;
+    try {
+      const qr = await QRCode.toString(url, { type: "terminal", small: true });
+      console.log(`  Scan QR ini dengan Kamera iPhone untuk membuka ${url} :\n`);
+      console.log(qr);
+    } catch {}
+  }
+  console.log("");
 });
