@@ -21,8 +21,11 @@ function deepClone(obj) {
 }
 
 // Deep-merge: nilai object di-merge rekursif, selain itu di-replace.
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function deepMerge(target, patch) {
   for (const key of Object.keys(patch)) {
+    if (UNSAFE_KEYS.has(key)) continue; // cegah prototype pollution
     const val = patch[key];
     if (
       val && typeof val === "object" && !Array.isArray(val) &&

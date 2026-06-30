@@ -69,7 +69,10 @@ wss.on("connection", (ws) => {
   const state = createSessionState();
 
   // Loop gerak mouse untuk stik kanan (mode mouse) — halus & terus menerus.
+  // `moving` mencegah tick saling tumpang-tindih bila operasi mouse lambat.
+  let moving = false;
   state.mouseLoop = setInterval(async () => {
+    if (moving) return;
     const cfg = getKeymap().rightStick;
     if (cfg.mode !== "mouse") return;
     const { x, y } = state.rightStick;
@@ -77,7 +80,12 @@ wss.on("connection", (ws) => {
     const mag = Math.hypot(x, y);
     if (mag < t) return;
     const s = cfg.sensitivity ?? 16;
-    await input.moveMouseBy(Math.round(x * s), Math.round(y * s));
+    moving = true;
+    try {
+      await input.moveMouseBy(Math.round(x * s), Math.round(y * s));
+    } finally {
+      moving = false;
+    }
   }, 16); // ~60 fps
 
   ws.on("message", async (raw) => {

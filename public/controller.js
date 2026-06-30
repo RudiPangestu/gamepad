@@ -49,7 +49,12 @@ connect();
 setInterval(() => send({ type: "ping" }), 2000);
 
 // --- Cegah scroll / zoom / gesture default --------------------------------
-document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+// Tapi IZINKAN scroll di dalam panel pengaturan (.sheet) yang memang panjang,
+// jika tidak, daftar remap tidak bisa di-scroll di iPhone.
+document.addEventListener("touchmove", (e) => {
+  if (e.target.closest && e.target.closest(".sheet")) return;
+  e.preventDefault();
+}, { passive: false });
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("dblclick", (e) => e.preventDefault());
 
@@ -390,6 +395,7 @@ function deepMergeLocal(target, patch) {
   const out = structuredClone(target);
   (function m(t, p) {
     for (const k of Object.keys(p)) {
+      if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
       if (p[k] && typeof p[k] === "object" && !Array.isArray(p[k]) &&
           t[k] && typeof t[k] === "object") {
         m(t[k], p[k]);

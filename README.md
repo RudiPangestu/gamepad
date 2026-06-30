@@ -18,7 +18,20 @@ hampir semua game di macOS yang memakai kontrol WASD + mouse.
 
 ---
 
-## ⚠️ Kenapa pakai keyboard/mouse, bukan "gamepad asli"?
+## ⚠️ Batasan yang perlu diketahui
+
+- **Stik kanan = kamera (mouse):** server menggerakkan kursor lewat *setPosition*
+  (memindah kursor). Ini bekerja untuk game 2D, menu, point-and-click, dan
+  banyak game. **Tapi sebagian game FPS 3D mengunci kursor / membaca gerak
+  mouse "mentah" (raw input)** sehingga pemindahan kursor tidak memutar kamera.
+  Untuk game seperti itu, kamera lewat stik kanan mungkin tidak berfungsi —
+  gunakan tombol/d-pad untuk aksi lain, atau remap sesuai kebutuhan.
+- **Getaran di iPhone:** iOS Safari tidak punya API getaran resmi; efek haptic
+  bersifat _best-effort_ dan bisa saja tidak terasa (lihat bagian Fitur).
+- **Satu controller:** dirancang untuk satu iPhone. Menyambungkan beberapa
+  iPhone sekaligus belum didukung.
+
+## ⚙️ Kenapa pakai keyboard/mouse, bukan "gamepad asli"?
 
 Membuat **virtual gamepad asli** (yang dikenali macOS persis seperti controller
 Xbox/PS fisik) membutuhkan driver / kernel extension dan sangat rumit di macOS
